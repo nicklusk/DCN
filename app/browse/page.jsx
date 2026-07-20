@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation' // CHANGED: added useSearchParams
 
 const CABLE_TYPES = ['All', 'USB-C', 'USB-A', 'Lightning', 'HDMI', 'DisplayPort', 'DVI', 'VGA', 'Audio', 'Coaxial', 'Ethernet', 'Other']
 
@@ -11,7 +11,9 @@ export default function Browse() {
   const [zip, setZip] = useState('')
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
+  const [toastMsg, setToastMsg] = useState(null) // ADDED: toast state
   const router = useRouter()
+  const searchParams = useSearchParams() // ADDED: searchParams hook
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -19,6 +21,12 @@ export default function Browse() {
       else setUser(data.user)
     })
     fetchCables()
+
+    // ADDED: detect ?posted=true and show toast
+    if (searchParams.get('posted') === 'true') {
+      setToastMsg("Cable posted! It's now visible to people near you.")
+      setTimeout(() => setToastMsg(null), 4000)
+    }
   }, [])
 
   const fetchCables = async (type = 'All', zipCode = '') => {
@@ -67,6 +75,13 @@ export default function Browse() {
         </div>
       </div>
 
+      {/* ADDED: toast notification */}
+      {toastMsg && (
+        <div style={styles.toast}>
+          ✓ {toastMsg}
+        </div>
+      )}
+
       <div style={styles.searchRow}>
         <input style={styles.zipInput} placeholder="Filter by ZIP code"
           value={zip} onChange={handleZip} maxLength={5} />
@@ -113,6 +128,8 @@ const styles = {
   green: { color: '#2a7c4f' },
   headerRight: { display: 'flex', gap: 8 },
   ghostBtn: { background: 'none', border: '1px solid #ddd', borderRadius: 8, padding: '7px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
+  // ADDED: toast style
+  toast: { background: '#e8f5ee', color: '#1a5c36', padding: '12px 16px', borderRadius: 10, fontSize: 14, margin: '12px 0' },
   searchRow: { padding: '16px 0 8px' },
   zipInput: { padding: '10px 14px', borderRadius: 10, border: '1px solid #e5e5e5', fontSize: 14, fontFamily: 'inherit', width: '100%', outline: 'none' },
   filterRow: { display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 0 16px' },
