@@ -70,7 +70,8 @@ export default function Browse() {
       <div style={styles.header}>
         <span style={styles.logo}>Dollar Cable <span style={styles.green}>Neighbor</span></span>
         <div style={styles.headerRight}>
-          <button style={styles.ghostBtn} onClick={() => router.push('/post')}>+ Post a cable</button>
+          <button style={styles.ghostBtn} onClick={() => router.push('/my-cables')}>My cables</button>
+          <button style={styles.ghostBtn} onClick={() => router.push('/post')}>+ Post</button>
           <button style={styles.ghostBtn} onClick={handleLogout}>Log out</button>
         </div>
       </div>
