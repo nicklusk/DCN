@@ -1,12 +1,16 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { stripePromise } from '@/lib/stripe'
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import {
+  Elements,
+  PaymentElement,
+  useStripe,
+  useElements
+} from '@stripe/react-stripe-js'
 
-// Inner form component — must be inside <Elements>
-function ClaimForm({ cable, user, clientSecret }) {
+function ClaimForm({ cable, user, onSuccess }) {
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
@@ -17,6 +21,14 @@ function ClaimForm({ cable, user, clientSecret }) {
     if (!stripe || !elements) return
     setLoading(true)
     setError(null)
+
+    // Submit the Elements form first
+    const { error: submitError } = await elements.submit()
+    if (submitError) {
+      setError(submitError.message)
+      setLoading(false)
+      return
+    }
 
     // Confirm the payment
     const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
@@ -30,8 +42,8 @@ function ClaimForm({ cable, user, clientSecret }) {
       return
     }
 
-    if (paymentIntent.status === 'requires_capture') {
-      // Payment is held — now mark cable as reserved and create claim record
+    if (paymentIntent && (paymentIntent.status === 'requires_capture' || paymentIntent.status === 'succeeded')) {
+      // Save claim to Supabase
       const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
 
       const { error: claimError } = await supabase.from('claims').insert({
@@ -43,7 +55,7 @@ function ClaimForm({ cable, user, clientSecret }) {
       })
 
       if (claimError) {
-        setError('Payment went through but claim failed to save. Contact support.')
+        setError('Payment went through but claim failed to save. Please contact support with payment ID: ' + paymentIntent.id)
         setLoading(false)
         return
       }
@@ -54,6 +66,9 @@ function ClaimForm({ cable, user, clientSecret }) {
         .eq('id', cable.id)
 
       router.push(`/claim/${cable.id}/confirmed`)
+    } else {
+      setError('Payment did not complete. Please try again.')
+      setLoading(false)
     }
   }
 
@@ -83,8 +98,11 @@ function ClaimForm({ cable, user, clientSecret }) {
 
       {error && <p style={styles.error}>{error}</p>}
 
-      <button style={loading ? styles.btnDisabled : styles.btn}
-        onClick={handlePay} disabled={loading || !stripe}>
+      <button
+        style={loading ? styles.btnDisabled : styles.btn}
+        onClick={handlePay}
+        disabled={loading || !stripe}
+      >
         {loading ? 'Processing...' : 'Pay $1 and reserve →'}
       </button>
 
@@ -95,7 +113,6 @@ function ClaimForm({ cable, user, clientSecret }) {
   )
 }
 
-// Outer page component — sets up Stripe Elements
 export default function ClaimPage() {
   const [cable, setCable] = useState(null)
   const [user, setUser] = useState(null)
@@ -104,15 +121,15 @@ export default function ClaimPage() {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const { id } = useParams()
+  // Track if we already created a PaymentIntent to avoid duplicates
+  const intentCreated = useRef(false)
 
   useEffect(() => {
     const init = async () => {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
 
-      // Get cable details
       const { data: cable, error: cableError } = await supabase
         .from('cables')
         .select('*, profiles(full_name)')
@@ -120,19 +137,25 @@ export default function ClaimPage() {
         .single()
 
       if (cableError || !cable) { router.push('/browse'); return }
+
       if (cable.status !== 'available') {
         setError('This cable has already been claimed by someone else.')
         setLoading(false)
         return
       }
+
       if (cable.user_id === user.id) {
         setError("You can't claim your own cable.")
         setLoading(false)
         return
       }
+
       setCable(cable)
 
-      // Create PaymentIntent
+      // Guard against double-creating PaymentIntents
+      if (intentCreated.current) return
+      intentCreated.current = true
+
       const res = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -140,7 +163,12 @@ export default function ClaimPage() {
       })
       const data = await res.json()
 
-      if (data.error) { setError(data.error); setLoading(false); return }
+      if (data.error) {
+        setError(data.error)
+        setLoading(false)
+        return
+      }
+
       setClientSecret(data.clientSecret)
       setLoading(false)
     }
@@ -149,13 +177,24 @@ export default function ClaimPage() {
   }, [id])
 
   if (loading) return (
-    <div style={styles.centered}><p style={styles.loadingText}>Setting up payment...</p></div>
+    <div style={styles.centered}>
+      <p style={styles.loadingText}>Setting up payment...</p>
+    </div>
   )
 
   if (error) return (
     <div style={styles.centered}>
       <p style={styles.errorBox}>{error}</p>
-      <button style={styles.btn} onClick={() => router.push('/browse')}>Back to browse</button>
+      <button style={styles.btn} onClick={() => router.push('/browse')}>
+        Back to browse
+      </button>
+    </div>
+  )
+
+  // Only render Elements once clientSecret is set and stable
+  if (!clientSecret) return (
+    <div style={styles.centered}>
+      <p style={styles.loadingText}>Preparing payment form...</p>
     </div>
   )
 
@@ -172,15 +211,21 @@ export default function ClaimPage() {
         <div>
           <div style={styles.cableType}>{cable.cable_type}</div>
           <div style={styles.cableMeta}>{cable.length} · {cable.condition}</div>
-          <div style={styles.cableGiver}>From {cable.profiles?.full_name || 'Anonymous'}</div>
+          <div style={styles.cableGiver}>
+            From {cable.profiles?.full_name || 'Anonymous'}
+          </div>
         </div>
       </div>
 
-      {clientSecret && (
-        <Elements stripe={stripePromise} options={{ clientSecret }}>
-          <ClaimForm cable={cable} user={user} clientSecret={clientSecret} />
-        </Elements>
-      )}
+      <Elements
+        stripe={stripePromise}
+        options={{
+          clientSecret,
+          appearance: { theme: 'stripe' }
+        }}
+      >
+        <ClaimForm cable={cable} user={user} />
+      </Elements>
     </div>
   )
 }
@@ -191,7 +236,7 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #eee', marginBottom: 20 },
   backBtn: { background: 'none', border: 'none', fontSize: 15, color: '#2a7c4f', cursor: 'pointer', fontFamily: 'inherit' },
   title: { fontSize: 17, fontWeight: 500 },
-  cablePreview: { display: 'flex', gap: 14, alignItems: 'center', background: '#f9f9f9', borderRadius: 12, padding: '14px', marginBottom: 20 },
+  cablePreview: { display: 'flex', gap: 14, alignItems: 'center', background: '#f9f9f9', borderRadius: 12, padding: 14, marginBottom: 20 },
   cableIcon: { fontSize: 36, width: 56, height: 56, background: '#e8f5ee', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   cableType: { fontSize: 16, fontWeight: 500 },
   cableMeta: { fontSize: 13, color: '#888', marginTop: 2 },
