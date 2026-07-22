@@ -11,20 +11,10 @@ export default function MyCables() {
   const [confirming, setConfirming] = useState(null)
   const router = useRouter()
 
-  useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setUser(user)
-      await fetchData(user.id)
-    }
-    init()
-  }, [])
-
+  // fetchData MUST come before useEffect
   const fetchData = async (userId) => {
     setLoading(true)
 
-    // Get all cables this user has listed
     const { data: cables } = await supabase
       .from('cables')
       .select('*')
@@ -33,19 +23,13 @@ export default function MyCables() {
 
     setListings(cables || [])
 
-    // Get all pending claims on this user's cables
     const { data: claimData } = await supabase
       .from('claims')
       .select('*, cables(cable_type, length, condition), profiles(full_name)')
       .eq('status', 'pending')
-      .in(
-        'cable_id',
-        (cables || []).map(c => c.id)
-      )
+      .in('cable_id', (cables || []).map(c => c.id))
       .order('created_at', { ascending: false })
 
-    // Attach claimer profile name separately
-    // since claims -> profiles join is on claimer_id
     const enriched = await Promise.all(
       (claimData || []).map(async (claim) => {
         const { data: claimer } = await supabase
@@ -60,6 +44,32 @@ export default function MyCables() {
     setClaims(enriched)
     setLoading(false)
   }
+
+  // useEffect comes AFTER fetchData
+useEffect(() => {
+  // Step 1: Auth and initial data load
+  supabase.auth.getUser().then(({ data: { user } }) => {
+    if (!user) { router.push('/login'); return }
+    setUser(user)
+    fetchData(user.id)
+
+    // Step 2: Set up real-time subscription synchronously
+    // (not inside async, which caused the error)
+    const channel = supabase
+      .channel('claims-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'claims' },
+        () => fetchData(user.id)
+      )
+      .subscribe()
+
+    // Cleanup on unmount
+    return () => supabase.removeChannel(channel)
+  })
+}, [])
+
+
 
   const handleGiverConfirm = async (claim) => {
     setConfirming(claim.id)
@@ -116,11 +126,14 @@ export default function MyCables() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
+        <div style={styles.header}>
         <button style={styles.backBtn} onClick={() => router.push('/browse')}>← Browse</button>
         <span style={styles.title}>My cables</span>
-        <button style={styles.postBtn} onClick={() => router.push('/post')}>+ Post</button>
-      </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+            <button style={styles.refreshBtn} onClick={() => fetchData(user?.id)}>↻ Refresh</button>
+            <button style={styles.postBtn} onClick={() => router.push('/post')}>+ Post</button>
+        </div>
+        </div>
 
       {/* Pending claims — action required */}
       {pendingClaims.length > 0 && (
@@ -257,4 +270,5 @@ const styles = {
   deleteBtn: { background: 'none', border: 'none', fontSize: 12, color: '#c0392b', cursor: 'pointer', fontFamily: 'inherit' },
   emptyState: { display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', padding: '32px 0' },
   emptyText: { color: '#888', fontSize: 15 },
+  refreshBtn: { background: 'none', border: '1px solid #ddd', borderRadius: 8, padding: '7px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', color: '#555' },
 }
