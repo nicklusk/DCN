@@ -16,16 +16,13 @@ export default function Browse() {
   const searchParams = useSearchParams() // ADDED: searchParams hook
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) router.push('/login')
-      else setUser(data.user)
-    })
-    fetchCables()
-
-    // ADDED: detect ?posted=true and show toast
     if (searchParams.get('posted') === 'true') {
       setToastMsg("Cable posted! It's now visible to people near you.")
       setTimeout(() => setToastMsg(null), 4000)
+    }
+    if (searchParams.get('completed') === 'true') {
+      setToastMsg("Transaction complete! Enjoy your cable. 🎉")
+      setTimeout(() => setToastMsg(null), 5000)
     }
   }, [])
 
