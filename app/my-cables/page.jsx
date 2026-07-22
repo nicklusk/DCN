@@ -12,102 +12,132 @@ export default function MyCables() {
   const router = useRouter()
 
   // fetchData MUST come before useEffect
-  const fetchData = async (userId) => {
-    setLoading(true)
+const fetchData = async (userId) => {
+  setLoading(true)
 
-    const { data: cables } = await supabase
-      .from('cables')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+  // Get all cables this user has listed
+  const { data: cables } = await supabase
+    .from('cables')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
 
-    setListings(cables || [])
+  setListings(cables || [])
 
-    const { data: claimData } = await supabase
-      .from('claims')
-      .select('*, cables(cable_type, length, condition), profiles(full_name)')
-      .eq('status', 'pending')
-      .in('cable_id', (cables || []).map(c => c.id))
-      .order('created_at', { ascending: false })
-
-    const enriched = await Promise.all(
-      (claimData || []).map(async (claim) => {
-        const { data: claimer } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', claim.claimer_id)
-          .single()
-        return { ...claim, claimer_name: claimer?.full_name || 'Someone' }
-      })
-    )
-
-    setClaims(enriched)
+  if (!cables || cables.length === 0) {
+    setClaims([])
     setLoading(false)
+    return
   }
 
+  // Get pending claims on this user's cables
+  // Note: no profiles join here — we fetch names separately below
+  const { data: claimData, error: claimError } = await supabase
+    .from('claims')
+    .select('*, cables(cable_type, length, condition)')
+    .eq('status', 'pending')
+    .in('cable_id', cables.map(c => c.id))
+    .order('created_at', { ascending: false })
+
+  if (claimError) {
+    console.error('Claims fetch error:', claimError)
+    setClaims([])
+    setLoading(false)
+    return
+  }
+
+  // Fetch claimer names one at a time using claimer_id → profiles.id
+  const enriched = await Promise.all(
+    (claimData || []).map(async (claim) => {
+      const { data: claimer } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', claim.claimer_id)
+        .single()
+      return { ...claim, claimer_name: claimer?.full_name || 'Someone' }
+    })
+  )
+
+  setClaims(enriched)
+  setLoading(false)
+}
+
   // useEffect comes AFTER fetchData
-useEffect(() => {
-  // Step 1: Auth and initial data load
-  supabase.auth.getUser().then(({ data: { user } }) => {
-    if (!user) { router.push('/login'); return }
-    setUser(user)
-    fetchData(user.id)
+    useEffect(() => {
+    let channel = null
+    let currentUserId = null
 
-    // Step 2: Set up real-time subscription synchronously
-    // (not inside async, which caused the error)
-    const channel = supabase
-      .channel('claims-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'claims' },
-        () => fetchData(user.id)
-      )
-      .subscribe()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) { router.push('/login'); return }
+        setUser(user)
+        currentUserId = user.id
+        fetchData(user.id)
 
-    // Cleanup on unmount
-    return () => supabase.removeChannel(channel)
-  })
-}, [])
+        // Use a unique channel name to avoid conflicts on remount
+        const channelName = `claims-changes-${Math.random()}`
+        channel = supabase.channel(channelName)
+
+        channel
+        .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'claims' },
+            () => {
+            if (currentUserId) fetchData(currentUserId)
+            }
+        )
+        .subscribe()
+    })
+
+    // Cleanup runs before remount, removing the old channel first
+    return () => {
+        if (channel) supabase.removeChannel(channel)
+    }
+    }, [])
 
 
 
-  const handleGiverConfirm = async (claim) => {
-    setConfirming(claim.id)
+const handleGiverConfirm = async (claim) => {
+  setConfirming(claim.id)
 
-    const { error } = await supabase
-      .from('claims')
-      .update({ giver_confirmed: true })
-      .eq('id', claim.id)
+  const { error } = await supabase
+    .from('claims')
+    .update({ giver_confirmed: true })
+    .eq('id', claim.id)
 
-    if (error) {
-      alert('Something went wrong. Try again.')
+  if (error) {
+    alert('Something went wrong. Try again.')
+    setConfirming(null)
+    return
+  }
+
+  // Re-fetch to get latest state including claimer's confirmation
+  const { data: updated } = await supabase
+    .from('claims')
+    .select('*')
+    .eq('id', claim.id)
+    .single()
+
+  if (updated.giver_confirmed && updated.claimer_confirmed) {
+    const res = await fetch('/api/capture-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claimId: claim.id })
+    })
+    const data = await res.json()
+    if (data.error) {
+      alert('Payment capture failed: ' + data.error)
       setConfirming(null)
       return
     }
-
-    // Check if claimer has also confirmed
-    const { data: updated } = await supabase
-      .from('claims')
-      .select('*')
-      .eq('id', claim.id)
-      .single()
-
-    if (updated.giver_confirmed && updated.claimer_confirmed) {
-      // Both confirmed — capture payment
-      await fetch('/api/capture-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimId: claim.id })
-      })
-      alert('Transaction complete! The $1 has been processed and the listing removed.')
-    } else {
-      alert(`Got it! Waiting on ${claim.claimer_name} to confirm their side.`)
-    }
-
-    // Refresh data
+    alert('Transaction complete! The $1 has been processed.')
+    router.push('/browse')
+  } else {
+    alert(`Confirmed! Waiting on ${claim.claimer_name} to confirm their side.`)
     await fetchData(user.id)
-    setConfirming(null)
   }
+
+  setConfirming(null)
+}
 
   const handleDelete = async (cableId) => {
     if (!confirm('Remove this listing? This cannot be undone.')) return

@@ -46,36 +46,45 @@ export default function Confirmed() {
     init()
   }, [id])
 
-  const handleConfirm = async () => {
-    if (!claim) return
+const handleConfirm = async () => {
+  if (!claim) return
 
-    const { error } = await supabase
-      .from('claims')
-      .update({ claimer_confirmed: true })
-      .eq('id', claim.id)
+  // Update claimer confirmation
+  const { error } = await supabase
+    .from('claims')
+    .update({ claimer_confirmed: true })
+    .eq('id', claim.id)
 
-    if (error) { alert('Something went wrong. Try again.'); return }
-
-    // Check if giver has also confirmed
-    const { data: updated } = await supabase
-      .from('claims')
-      .select('*')
-      .eq('id', claim.id)
-      .single()
-
-    if (updated.giver_confirmed && updated.claimer_confirmed) {
-      // Both confirmed — capture the payment
-      await fetch('/api/capture-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimId: claim.id })
-      })
-      router.push('/browse?completed=true')
-    } else {
-      // Waiting on giver
-      setClaim(updated)
-    }
+  if (error) {
+    alert('Something went wrong. Try again.')
+    return
   }
+
+  // Re-fetch the claim to get the latest state from the server
+  const { data: updated } = await supabase
+    .from('claims')
+    .select('*')
+    .eq('id', claim.id)
+    .single()
+
+  setClaim(updated)
+
+  if (updated.giver_confirmed && updated.claimer_confirmed) {
+    // Both confirmed — trigger capture
+    const res = await fetch('/api/capture-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claimId: claim.id })
+    })
+    const data = await res.json()
+    if (data.error) {
+      alert('Payment capture failed: ' + data.error)
+      return
+    }
+    router.push('/browse?completed=true')
+  }
+  // If giver hasn't confirmed yet, the UI updates to show waiting state
+}
 
   if (loading) return (
     <div style={styles.centered}>
