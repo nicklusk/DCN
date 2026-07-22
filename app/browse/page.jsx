@@ -16,6 +16,14 @@ function Browse() {
   const searchParams = useSearchParams() // ADDED: searchParams hook
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) router.push('/login')
+      else setUser(data.user)
+    })
+
+    // Call fetchCables directly here with default params
+    fetchCables('All', '')
+
     if (searchParams.get('posted') === 'true') {
       setToastMsg("Cable posted! It's now visible to people near you.")
       setTimeout(() => setToastMsg(null), 4000)
