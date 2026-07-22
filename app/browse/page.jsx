@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter, useSearchParams } from 'next/navigation' // CHANGED: added useSearchParams
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const CABLE_TYPES = ['All', 'USB-C', 'USB-A', 'Lightning', 'HDMI', 'DisplayPort', 'DVI', 'VGA', 'Audio', 'Coaxial', 'Ethernet', 'Other']
 
-export default function Browse() {
+function Browse() {
   const [cables, setCables] = useState([])
   const [filter, setFilter] = useState('All')
   const [zip, setZip] = useState('')
@@ -142,4 +142,12 @@ const styles = {
   cardGiver: { fontSize: 13, color: '#2a7c4f', marginTop: 4 },
   badge: { background: '#e8f5ee', color: '#1a5c36', fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 500 },
   empty: { textAlign: 'center', color: '#888', padding: '60px 0', fontSize: 15 }
+}
+
+export default function BrowsePage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', fontFamily: 'system-ui', color: '#888' }}>Loading...</div>}>
+      <Browse />
+    </Suspense>
+  )
 }
