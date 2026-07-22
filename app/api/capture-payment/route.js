@@ -62,14 +62,22 @@ export async function POST(req) {
     }
 
     // Delete the cable listing
+    // Delete the claim first (it references the cable)
+    const { error: claimDeleteError } = await supabase
+    .rpc('delete_claim_after_capture', { claim_id_input: claimId })
+
+    if (claimDeleteError) {
+    console.error('Claim delete error:', claimDeleteError)
+    return NextResponse.json({ error: 'Failed to delete claim' }, { status: 500 })
+    }
+
+    // Now delete the cable safely
     const { error: deleteError } = await supabase
-      .from('cables')
-      .delete()
-      .eq('id', claim.cable_id)
+    .rpc('delete_cable_after_claim', { cable_id_input: claim.cable_id })
 
     if (deleteError) {
-      console.error('Cable delete error:', deleteError)
-      return NextResponse.json({ error: 'Failed to delete cable' }, { status: 500 })
+    console.error('Cable delete error:', deleteError)
+    return NextResponse.json({ error: 'Failed to delete cable' }, { status: 500 })
     }
 
     console.log('Transaction complete — cable deleted')
