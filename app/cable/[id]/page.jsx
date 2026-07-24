@@ -24,12 +24,6 @@ export default function CableDetail() {
 
   const fetchCable = async () => {
     const { data, error } = await supabase
-      .from('cables')
-      .select('*, profiles(full_name, zip)')
-      .eq('id', id)
-      .single()
-
-    const { data, error } = await supabase
         .from('cables')
         .select('*, profiles(full_name, zip, avatar_url)')
         .eq('id', id)
@@ -180,7 +174,7 @@ export default function CableDetail() {
 
         {isOwner && (
           <div style={styles.ownerNote}>
-            This is your listing. Share the link to let people know it's available!
+            This is your listing. Share the link to let people know it&apos;s available!
           </div>
         )}
 
