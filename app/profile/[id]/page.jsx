@@ -174,21 +174,18 @@ export default function ProfilePage() {
       <div style={s.profileCard}>
         <div style={s.avatarWrap}>
         {profile.avatar_url ? (
-            <div style={s.avatarRect}>
             <Image
-                src={profile.avatar_url}
-                alt={profile.full_name || 'Profile photo'}
-                width={80}
-                height={110}
-                style={{ 
-                objectFit: 'cover', 
+            src={profile.avatar_url}
+            alt={profile.full_name || 'Profile photo'}
+            width={80}
+            height={110}
+            style={{
+                objectFit: 'cover',
                 borderRadius: 10,
                 display: 'block',
-                width: '100%',
-                height: '100%'
-                }}
+                flexShrink: 0,
+            }}
             />
-            </div>
         ) : (
             <div style={s.avatarFallback}>{initials}</div>
         )}
@@ -380,11 +377,9 @@ const s = {
   backBtn: { background: 'none', border: 'none', fontSize: 15, color: '#2a7c4f', cursor: 'pointer', fontFamily: 'inherit' },
   ghostBtn: { background: 'none', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '7px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-primary)' },
   profileCard: { display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 20, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 },
-  avatarWrap: { position: 'relative', flexShrink: 0 },
-  avatarRect: { width: 80, height: 110, borderRadius: 10, overflow: 'hidden', background: '#e8f5ee', flexShrink: 0, },
+  avatarWrap: { position: 'relative', flexShrink: 0, width: 80, height: 110 },
   avatarFallback: { width: 80, height: 110, borderRadius: 10, background: '#cde9d9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 500, color: '#1a5c36' },
-  avatarEdit: { position: 'absolute', bottom: 6, right: 6, width: 26, height: 26, borderRadius: 6, background: '#2a7c4f', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  profileInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 8 },
+  avatarEdit: { position: 'absolute', bottom: 6, right: 6, width: 26, height: 26, borderRadius: 6, background: '#2a7c4f', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' },  profileInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 8 },
   profileName: { fontSize: 20, fontWeight: 500, color: 'var(--text-primary)' },
   profileMeta: { fontSize: 14 },
   locationRow: { display: 'flex', alignItems: 'center', gap: 8 },
