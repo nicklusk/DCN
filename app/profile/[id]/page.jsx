@@ -42,11 +42,13 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUser(user)
 
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', id)
-        .single()
+    const { data: prof } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+    console.log('Profile loaded:', prof?.full_name, 'Avatar:', prof?.avatar_url)
 
       if (!prof) { router.push('/browse'); return }
       setProfile(prof)
@@ -71,25 +73,36 @@ export default function ProfilePage() {
     init()
   }, [id])
 
-  const handleAvatarUpload = async (e) => {
+    const handleAvatarUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
     setUploadingAvatar(true)
 
+    // Resize to portrait thumbnail before upload
+    const { resizeImage } = await import('@/lib/imageUtils')
+    const resized = await resizeImage(file, 240, 330, 0.85)
+
     const fileName = `avatar-${currentUser.id}-${Date.now()}.jpg`
     const { error } = await supabase.storage
-      .from('cable-photos')
-      .upload(fileName, file, { upsert: true })
+        .from('cable-photos')
+        .upload(fileName, resized, { 
+        contentType: 'image/jpeg',
+        upsert: true 
+        })
 
     if (!error) {
-      const { data } = supabase.storage.from('cable-photos').getPublicUrl(fileName)
-      await supabase.from('profiles')
+        const { data } = supabase.storage
+        .from('cable-photos')
+        .getPublicUrl(fileName)
+        await supabase.from('profiles')
         .update({ avatar_url: data.publicUrl })
         .eq('id', currentUser.id)
-      setProfile(p => ({ ...p, avatar_url: data.publicUrl }))
+        setProfile(p => ({ ...p, avatar_url: data.publicUrl }))
+    } else {
+        alert('Upload failed. Try again.')
     }
     setUploadingAvatar(false)
-  }
+    }
 
   const handleLocationSave = async () => {
     await supabase.from('profiles')
@@ -164,9 +177,16 @@ export default function ProfilePage() {
             <div style={s.avatarRect}>
             <Image
                 src={profile.avatar_url}
-                alt={profile.full_name}
-                fill
-                style={{ objectFit: 'cover' }}
+                alt={profile.full_name || 'Profile photo'}
+                width={80}
+                height={110}
+                style={{ 
+                objectFit: 'cover', 
+                borderRadius: 10,
+                display: 'block',
+                width: '100%',
+                height: '100%'
+                }}
             />
             </div>
         ) : (
@@ -361,8 +381,9 @@ const s = {
   ghostBtn: { background: 'none', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '7px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-primary)' },
   profileCard: { display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 20, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 },
   avatarWrap: { position: 'relative', flexShrink: 0 },
-  avatarFallback: { width: 72, height: 72, borderRadius: '50%', background: '#cde9d9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: '#1a5c36' },
-  avatarEdit: { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: '50%', background: '#2a7c4f', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  avatarRect: { width: 80, height: 110, borderRadius: 10, overflow: 'hidden', background: '#e8f5ee', flexShrink: 0, },
+  avatarFallback: { width: 80, height: 110, borderRadius: 10, background: '#cde9d9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 500, color: '#1a5c36' },
+  avatarEdit: { position: 'absolute', bottom: 6, right: 6, width: 26, height: 26, borderRadius: 6, background: '#2a7c4f', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   profileInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 8 },
   profileName: { fontSize: 20, fontWeight: 500, color: 'var(--text-primary)' },
   profileMeta: { fontSize: 14 },
