@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 
 const CABLE_TYPES = ['All', 'USB-C', 'USB-A', 'Lightning', 'HDMI', 'DisplayPort', 'DVI', 'VGA', 'Audio', 'Coaxial', 'Ethernet', 'Other']
 
@@ -110,15 +111,17 @@ function Browse() {
           {cables.map(cable => (
             <div key={cable.id} style={styles.card}
               onClick={() => router.push(`/cable/${cable.id}`)}>
-              {cable.thumb_url || cable.photo_url ? (
-                <img
-                  src={cable.thumb_url || cable.photo_url}
-                  alt={cable.cable_type}
-                  style={styles.cardThumb}
-                />
-              ) : (
-                <div style={styles.cardImg}>🔌</div>
-              )}
+            {cable.thumb_url || cable.photo_url ? (
+              <Image
+                src={cable.thumb_url || cable.photo_url}
+                alt={cable.cable_type}
+                width={52}
+                height={52}
+                style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+              />
+            ) : (
+              <div style={styles.cardImg}>🔌</div>
+            )}
               <div style={styles.cardBody}>
                 <div style={styles.cardTitle}>{cable.cable_type}</div>
                 <div style={styles.cardMeta}>{cable.length} · {cable.condition}</div>
@@ -157,7 +160,6 @@ const styles = {
   cardGiver: { fontSize: 13, color: '#2a7c4f', marginTop: 4 },
   badge: { background: '#e8f5ee', color: '#1a5c36', fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 500 },
   empty: { textAlign: 'center', color: '#888', padding: '60px 0', fontSize: 15 },
-  cardThumb: { width: 52, height: 52, minWidth: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0, display: 'block'},
 }
 
 export default function BrowsePage() {

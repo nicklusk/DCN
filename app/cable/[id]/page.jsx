@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
 
 export default function CableDetail() {
   const [cable, setCable] = useState(null)
@@ -75,12 +76,21 @@ export default function CableDetail() {
       </div>
 
       {/* Photo or placeholder */}
-      <div style={cable.photo_url ? styles.photoWrap : styles.photoPlaceholder}>
-        {cable.photo_url
-          ? <img src={cable.photo_url} alt={cable.cable_type} style={styles.photo} />
-          : <span style={styles.photoIcon}>🔌</span>
-        }
-      </div>
+        {cable.photo_url ? (
+        <div style={styles.photoWrap}>
+            <Image
+            src={cable.photo_url}
+            alt={cable.cable_type}
+            fill
+            style={{ objectFit: 'cover' }}
+            priority
+            />
+        </div>
+        ) : (
+        <div style={styles.photoPlaceholder}>
+            <span style={styles.photoIcon}>🔌</span>
+        </div>
+        )}
 
       <div style={styles.body}>
         {/* Title + badges */}
@@ -169,8 +179,7 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: '1px solid #eee' },
   backBtn: { background: 'none', border: 'none', fontSize: 15, color: '#2a7c4f', cursor: 'pointer', fontFamily: 'inherit' },
   deleteBtn: { background: 'none', border: '1px solid #e5e5e5', borderRadius: 8, padding: '6px 12px', fontSize: 13, color: '#c0392b', cursor: 'pointer', fontFamily: 'inherit' },
-  photoWrap: { width: '100%', height: 220, overflow: 'hidden' },
-  photo: { width: '100%', height: '100%', objectFit: 'cover' },
+  photoWrap: { width: '100%', height: 220, overflow: 'hidden', position: 'relative' },  photo: { width: '100%', height: '100%', objectFit: 'cover' },
   photoPlaceholder: { width: '100%', height: 180, background: '#e8f5ee', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   photoIcon: { fontSize: 64 },
   body: { padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 18 },
