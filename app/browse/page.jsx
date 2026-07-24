@@ -22,8 +22,15 @@ function Browse() {
       else setUser(data.user)
     })
 
-    // Call fetchCables directly here with default params
-    fetchCables('All', '')
+    const q = searchParams.get('q') || ''
+    const type = searchParams.get('type') || ''
+    const zip = searchParams.get('zip') || ''
+
+    if (q) setSearchText(q) // you'll need to add a searchText state
+    if (zip) setZip(zip)
+    if (type) setFilter(type)
+
+    fetchCables(type || 'All', zip, q)
 
     if (searchParams.get('posted') === 'true') {
       setToastMsg("Cable posted! It's now visible to people near you.")
@@ -35,7 +42,7 @@ function Browse() {
     }
   }, [])
 
-  const fetchCables = async (type = 'All', zipCode = '') => {
+  const fetchCables = async (type = 'All', zipCode = '', text = '') => {
     setLoading(true)
     let query = supabase
       .from('cables')
@@ -43,11 +50,14 @@ function Browse() {
       .eq('status', 'available')
       .order('created_at', { ascending: false })
 
-    if (type !== 'All') {
+    if (type && type !== 'All') {
       query = query.ilike('cable_type', `%${type}%`)
     }
     if (zipCode.length === 5) {
       query = query.eq('zip', zipCode)
+    }
+    if (text) {
+      query = query.ilike('cable_type', `%${text}%`)
     }
 
     const { data, error } = await query
@@ -126,8 +136,9 @@ function Browse() {
                 <div style={styles.cardTitle}>{cable.cable_type}</div>
                 <div style={styles.cardMeta}>{cable.length} · {cable.condition}</div>
                 <div style={styles.cardMeta}>📍 {cable.zip || 'Location not set'}</div>
-                <div style={styles.cardGiver}>
-                  {cable.profiles?.full_name || 'Anonymous'}
+                <div style={styles.cardGiver}
+                  onClick={e => { e.stopPropagation(); router.push(`/profile/${cable.user_id}`) }}>
+                  {cable.profiles?.full_name || 'Anonymous'} →
                 </div>
               </div>
               <span style={styles.badge}>Available</span>

@@ -5,12 +5,17 @@ import { useRouter } from 'next/navigation'
 import { resizeImage } from '@/lib/imageUtils'
 
 const CABLE_TYPES = [
+  // USB
   'USB-A to USB-C',
   'USB-A to Micro-USB',
   'USB-A to Mini-USB',
+  'USB-A to USB-B',
   'USB-C to USB-C',
+  'USB 3.0 Type-A to Type-A',
+  'USB 3.0 Type-A to Type-B',
   'Lightning to USB-A',
   'Lightning to USB-C',
+  // Video
   'HDMI (standard)',
   'Mini HDMI',
   'Micro HDMI',
@@ -18,12 +23,22 @@ const CABLE_TYPES = [
   'Mini DisplayPort',
   'DVI-D',
   'VGA',
+  // Audio
   '3.5mm Audio',
   'Optical (TOSLINK)',
   'RCA / Composite',
+  'XLR (balanced audio)',
+  'MIDI (5-pin DIN)',
+  'Instrument / Guitar / Patch (6.35mm TS)',
   'Coaxial / Speaker Wire',
+  // Serial / Legacy
+  'DB9 (RS-232 Serial)',
+  // Network
   'Ethernet / Cat5e',
   'Ethernet / Cat6',
+  // Adapter
+  'Adapter (describe in notes)',
+  // Other
   'Other (describe in notes)',
 ]
 
@@ -144,11 +159,16 @@ const handleSubmit = async () => {
       <div style={styles.form}>
 
         <div style={styles.group}>
-          <label style={styles.label}>Cable type</label>
-          <select style={styles.select} value={cableType}
+        <label style={styles.label}>Cable or adapter type</label>
+        <select style={styles.select} value={cableType}
             onChange={e => setCableType(e.target.value)}>
             {CABLE_TYPES.map(t => <option key={t}>{t}</option>)}
-          </select>
+        </select>
+        {cableType === 'Adapter (describe in notes)' && (
+            <span style={styles.hint}>
+            Describe the adapter fully in the notes field below — e.g. "HDMI female to VGA male" or "USB-C to 3.5mm audio".
+            </span>
+        )}
         </div>
 
         <div style={styles.row}>

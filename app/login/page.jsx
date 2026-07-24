@@ -17,7 +17,8 @@ export default function Login() {
     if (error) {
       setError(error.message)
     } else {
-      router.push('/browse')
+      const { data: { user } } = await supabase.auth.getUser()
+      router.push(`/profile/${user.id}`)
     }
     setLoading(false)
   }

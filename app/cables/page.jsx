@@ -146,6 +146,78 @@ const cables = [
     tip:'Chunky phone-jack shape with 8 pins and a locking tab. Cat rating (Cat5e, Cat6) is printed on the cable body.',
     years:'1990s–present', speeds:'Up to 10 Gbps (Cat6A)'
   },
+  {
+    id:'usb-b', name:'USB-A to USB-B', cat:'USB',
+    badge:'Common', badgeColor:'#e8f5ee', badgeText:'#1a5c36',
+    sub:'Connects computers to printers, scanners, and audio interfaces',
+    devices:'Printers, scanners, USB audio interfaces, MIDI controllers, older external hard drives',
+    howToID:'USB-B end is a chunky square plug with two beveled top corners. Much chunkier than any other USB connector.',
+    tip:'If it plugs into a printer and the device-end looks like a square with the top two corners cut off, it\'s USB-B.',
+    years:'1996–present', speeds:'Up to 480 Mbps'
+  },
+  {
+    id:'usb3-a', name:'USB 3.0 Type-A', cat:'USB',
+    badge:'Common', badgeColor:'#e8f5ee', badgeText:'#1a5c36',
+    sub:'Same shape as USB-A but faster — often blue inside',
+    devices:'External hard drives, SSDs, USB hubs, flash drives, faster peripherals',
+    howToID:'Identical shape to standard USB-A but the inside plastic is blue. Cable itself often has blue housing at the connector.',
+    tip:'Blue inside the rectangular port or plug = USB 3.0. Backward compatible with USB 2.0 ports.',
+    years:'2008–present', speeds:'Up to 5 Gbps'
+  },
+  {
+    id:'usb3-b', name:'USB 3.0 Type-B', cat:'USB',
+    badge:'Less common', badgeColor:'#f5f5f5', badgeText:'#555',
+    sub:'Faster version of USB-B for external drives and docks',
+    devices:'External hard drives, docking stations, some printers',
+    howToID:'Like USB-B but with an extra rectangular bump on top of the square connector. Blue housing common.',
+    tip:'If it looks like a USB-B square plug but has an extra protrusion on top, it\'s USB 3.0 Type-B.',
+    years:'2008–present', speeds:'Up to 5 Gbps'
+  },
+  {
+    id:'xlr', name:'XLR (balanced audio)', cat:'Audio',
+    badge:'Pro audio', badgeColor:'#fff8e1', badgeText:'#7c5c1a',
+    sub:'Professional microphone and balanced audio cable',
+    devices:'Microphones, mixing boards, PA systems, studio monitors, audio interfaces',
+    howToID:'Large round connector with 3 pins arranged in a triangle inside a circular metal housing. Has a locking tab. Male has pins, female has holes.',
+    tip:'If it\'s a chunky round metal connector with 3 pins and a click-lock, it\'s XLR. Female end goes to the mic, male to the interface.',
+    years:'1950s–present', speeds:'Analog balanced audio'
+  },
+  {
+    id:'midi', name:'MIDI (5-pin DIN)', cat:'Audio',
+    badge:'Music gear', badgeColor:'#fff8e1', badgeText:'#7c5c1a',
+    sub:'Connects keyboards, synthesizers, and music hardware',
+    devices:'Keyboards, synthesizers, drum machines, MIDI controllers, older Roland/Yamaha/Korg gear',
+    howToID:'Round connector with 5 pins arranged in a semicircle inside a larger circular housing. Similar to old PS/2 mouse connectors but with 5 pins.',
+    tip:'Round plug with 5 pins in a half-circle pattern. Carries musical note data, not audio — you won\'t hear anything from it directly.',
+    years:'1983–present', speeds:'31.25 kbps (MIDI data)'
+  },
+  {
+    id:'instrument', name:'Instrument / Guitar / Patch (6.35mm)', cat:'Audio',
+    badge:'Music gear', badgeColor:'#fff8e1', badgeText:'#7c5c1a',
+    sub:'Standard guitar, bass, and instrument cable',
+    devices:'Electric guitars, basses, keyboards, effects pedals, amplifiers, DJ mixers',
+    howToID:'Large round plug, 6.35mm (1/4 inch) diameter — about twice the size of a headphone jack. One or two black rings on the shaft (TS = mono, TRS = stereo/balanced).',
+    tip:'Looks like a giant headphone jack. One ring = guitar/instrument cable (TS). Two rings = balanced or stereo (TRS).',
+    years:'1878–present', speeds:'Analog audio'
+  },
+  {
+    id:'db9', name:'DB9 (RS-232 Serial)', cat:'Network',
+    badge:'Legacy / industrial', badgeColor:'#fdf0f0', badgeText:'#7c1a1a',
+    sub:'Serial communication cable for older computers and industrial equipment',
+    devices:'Older PCs, CNC machines, POS systems, network equipment consoles, Arduino programming',
+    howToID:'D-shaped metal housing with 9 pins (male) or 9 holes (female) in two rows. Screw locks on both sides. Teal or gray housing common.',
+    tip:'If it has a D-shaped metal shell with 9 pins and screw locks on the sides, it\'s DB9 serial. Still common in industrial and networking equipment.',
+    years:'1969–present', speeds:'Up to 115.2 kbps'
+  },
+  {
+    id:'adapter', name:'Adapter (general)', cat:'USB',
+    badge:'Varies', badgeColor:'#f5f5f5', badgeText:'#555',
+    sub:'A short connector that converts one plug type to another without a cable',
+    devices:'Anything — adapters bridge two different connector standards',
+    howToID:'Usually a small dongle with one connector type on each end. No cable body — just a short rigid piece.',
+    tip:'If it\'s a small plug-to-plug converter with no cable between them, it\'s an adapter. Check both ends and describe what each side connects to.',
+    years:'Varies', speeds:'Depends on type'
+  },
 ]
 
 const CATS = ['All', 'USB', 'Apple', 'Video', 'Audio', 'Network']

@@ -82,7 +82,8 @@ export default function CableDetail() {
             src={cable.photo_url}
             alt={cable.cable_type}
             fill
-            style={{ objectFit: 'cover' }}
+            sizes="(max-width: 560px) 100vw, 560px"
+            style={{ objectFit: 'contain', background: '#e8f5ee' }}
             priority
             />
         </div>
@@ -132,7 +133,8 @@ export default function CableDetail() {
         )}
 
         {/* Giver card */}
-        <div style={styles.giverCard}>
+        <div style={{ ...styles.giverCard, cursor: 'pointer' }}
+            onClick={() => router.push(`/profile/${cable.user_id}`)}>
           <div style={styles.avatar}>
             {(giver?.full_name || 'A')[0].toUpperCase()}
           </div>
@@ -179,7 +181,7 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: '1px solid #eee' },
   backBtn: { background: 'none', border: 'none', fontSize: 15, color: '#2a7c4f', cursor: 'pointer', fontFamily: 'inherit' },
   deleteBtn: { background: 'none', border: '1px solid #e5e5e5', borderRadius: 8, padding: '6px 12px', fontSize: 13, color: '#c0392b', cursor: 'pointer', fontFamily: 'inherit' },
-  photoWrap: { width: '100%', height: 220, overflow: 'hidden', position: 'relative' },  photo: { width: '100%', height: '100%', objectFit: 'cover' },
+  photoWrap: { width: '100%', aspectRatio: '16/9', overflow: 'hidden', position: 'relative', maxHeight: 280, },
   photoPlaceholder: { width: '100%', height: 180, background: '#e8f5ee', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   photoIcon: { fontSize: 64 },
   body: { padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 18 },
