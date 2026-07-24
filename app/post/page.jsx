@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { resizeImage } from '@/lib/imageUtils'
 
 const CABLE_TYPES = [
   'USB-A to USB-C',
@@ -62,56 +63,75 @@ export default function PostCable() {
     setPhotoPreview(URL.createObjectURL(file))
   }
 
-  const handleSubmit = async () => {
-    if (!zip || zip.length !== 5) { setError('Please enter a valid 5-digit ZIP code.'); return }
-    setLoading(true)
-    setError(null)
+const handleSubmit = async () => {
+  if (!zip || zip.length !== 5) {
+    setError('Please enter a valid 5-digit ZIP code.')
+    return
+  }
+  setLoading(true)
+  setError(null)
 
-    let photoUrl = null
+  let photoUrl = null
+  let thumbUrl = null
 
-    // Upload photo if provided
-    if (photo) {
-      const ext = photo.name.split('.').pop()
-      const fileName = `${user.id}-${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from('cable-photos')
-        .upload(fileName, photo)
+  if (photo) {
+    const ext = 'jpg'
+    const baseName = `${user.id}-${Date.now()}`
 
-      if (uploadError) {
-        setError('Photo upload failed. Try again or skip the photo.')
-        setLoading(false)
-        return
-      }
+    // Upload full-size image
+    const fullName = `${baseName}-full.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('cable-photos')
+      .upload(fullName, photo)
 
-      const { data: urlData } = supabase.storage
-        .from('cable-photos')
-        .getPublicUrl(fileName)
-      photoUrl = urlData.publicUrl
-    }
-
-    // Save cable listing
-    const { error: insertError } = await supabase.from('cables').insert({
-      user_id: user.id,
-      cable_type: cableType,
-      length,
-      condition,
-      notes,
-      zip,
-      photo_url: photoUrl,
-      status: 'available',
-    })
-
-    if (insertError) {
-      setError('Something went wrong saving your listing. Try again.')
+    if (uploadError) {
+      setError('Photo upload failed. Try again or skip the photo.')
       setLoading(false)
       return
     }
 
-    // Save ZIP to their profile for next time
-    await supabase.from('profiles').update({ zip }).eq('id', user.id)
+    const { data: fullUrlData } = supabase.storage
+      .from('cable-photos')
+      .getPublicUrl(fullName)
+    photoUrl = fullUrlData.publicUrl
 
-    router.push('/browse?posted=true')
+    // Generate and upload thumbnail (200x200 max, 80% quality)
+    const thumbBlob = await resizeImage(photo, 200, 200, 0.8)
+    const thumbName = `${baseName}-thumb.jpg`
+    const { error: thumbError } = await supabase.storage
+      .from('cable-photos')
+      .upload(thumbName, thumbBlob, { contentType: 'image/jpeg' })
+
+    if (!thumbError) {
+      const { data: thumbUrlData } = supabase.storage
+        .from('cable-photos')
+        .getPublicUrl(thumbName)
+      thumbUrl = thumbUrlData.publicUrl
+    }
   }
+
+  // Save listing with both URLs
+  const { error: insertError } = await supabase.from('cables').insert({
+    user_id: user.id,
+    cable_type: cableType,
+    length,
+    condition,
+    notes,
+    zip,
+    photo_url: photoUrl,
+    thumb_url: thumbUrl,
+    status: 'available',
+  })
+
+  if (insertError) {
+    setError('Something went wrong saving your listing. Try again.')
+    setLoading(false)
+    return
+  }
+
+  await supabase.from('profiles').update({ zip }).eq('id', user.id)
+  router.push('/browse?posted=true')
+}
 
   return (
     <div style={styles.page}>

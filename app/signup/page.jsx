@@ -54,8 +54,7 @@ const styles = {
   green: { color: '#2a7c4f' },
   sub: { textAlign: 'center', color: '#666', marginBottom: 32, fontSize: 15 },
   card: { background: '#fff', border: '1px solid #e5e5e5', borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', gap: 12 },
-  input: { padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e5e5', fontSize: 15, fontFamily: 'inherit', outline: 'none' },
-  btn: { background: '#2a7c4f', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
+  input: { padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e5e5', fontSize: 15, fontFamily: 'inherit', outline: 'none', color: 'var(--text-primary)' },  btn: { background: '#2a7c4f', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
   error: { color: '#c0392b', fontSize: 13 },
   link: { textAlign: 'center', fontSize: 13, color: '#666' }
 }

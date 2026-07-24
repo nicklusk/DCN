@@ -110,7 +110,15 @@ function Browse() {
           {cables.map(cable => (
             <div key={cable.id} style={styles.card}
               onClick={() => router.push(`/cable/${cable.id}`)}>
-              <div style={styles.cardImg}>🔌</div>
+              {cable.thumb_url || cable.photo_url ? (
+                <img
+                  src={cable.thumb_url || cable.photo_url}
+                  alt={cable.cable_type}
+                  style={styles.cardThumb}
+                />
+              ) : (
+                <div style={styles.cardImg}>🔌</div>
+              )}
               <div style={styles.cardBody}>
                 <div style={styles.cardTitle}>{cable.cable_type}</div>
                 <div style={styles.cardMeta}>{cable.length} · {cable.condition}</div>
@@ -135,13 +143,11 @@ const styles = {
   green: { color: '#2a7c4f' },
   headerRight: { display: 'flex', gap: 8 },
   ghostBtn: { background: 'none', border: '1px solid #ddd', borderRadius: 8, padding: '7px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
-  // ADDED: toast style
   toast: { background: '#e8f5ee', color: '#1a5c36', padding: '12px 16px', borderRadius: 10, fontSize: 14, margin: '12px 0' },
   searchRow: { padding: '16px 0 8px' },
   zipInput: { padding: '10px 14px', borderRadius: 10, border: '1px solid #e5e5e5', fontSize: 14, fontFamily: 'inherit', width: '100%', outline: 'none' },
   filterRow: { display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 0 16px' },
-  chip: { padding: '5px 14px', borderRadius: 20, border: '1px solid #e5e5e5', background: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
-  chipActive: { padding: '5px 14px', borderRadius: 20, border: '1px solid #2a7c4f', background: '#2a7c4f', color: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
+  chip: { padding: '5px 14px', borderRadius: 20, border: '1px solid #e5e5e5', background: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', color: 'var(--text-primary)' },  chipActive: { padding: '5px 14px', borderRadius: 20, border: '1px solid #2a7c4f', background: '#2a7c4f', color: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
   grid: { display: 'flex', flexDirection: 'column', gap: 10 },
   card: { background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: 14, display: 'flex', gap: 12, cursor: 'pointer', alignItems: 'center' },
   cardImg: { width: 52, height: 52, borderRadius: 10, background: '#e8f5ee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 },
@@ -150,7 +156,8 @@ const styles = {
   cardMeta: { fontSize: 13, color: '#888', marginBottom: 2 },
   cardGiver: { fontSize: 13, color: '#2a7c4f', marginTop: 4 },
   badge: { background: '#e8f5ee', color: '#1a5c36', fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 500 },
-  empty: { textAlign: 'center', color: '#888', padding: '60px 0', fontSize: 15 }
+  empty: { textAlign: 'center', color: '#888', padding: '60px 0', fontSize: 15 },
+  cardThumb: { width: 52, height: 52, minWidth: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0, display: 'block'},
 }
 
 export default function BrowsePage() {

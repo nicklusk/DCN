@@ -239,7 +239,15 @@ const handleGiverConfirm = async (claim) => {
           listings.map(cable => (
             <div key={cable.id} style={styles.listingCard}
               onClick={() => router.push(`/cable/${cable.id}`)}>
-              <div style={styles.listingIcon}>🔌</div>
+              {cable.thumb_url || cable.photo_url ? (
+                <img
+                    src={cable.thumb_url || cable.photo_url}
+                    alt={cable.cable_type}
+                    style={styles.listingThumb}
+                />
+                ) : (
+                <div style={styles.listingIcon}>🔌</div>
+                )}
               <div style={styles.listingInfo}>
                 <div style={styles.listingType}>{cable.cable_type}</div>
                 <div style={styles.listingMeta}>{cable.length} · {cable.condition}</div>
@@ -301,4 +309,5 @@ const styles = {
   emptyState: { display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', padding: '32px 0' },
   emptyText: { color: '#888', fontSize: 15 },
   refreshBtn: { background: 'none', border: '1px solid #ddd', borderRadius: 8, padding: '7px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', color: '#555' },
+  listingThumb: { width: 48, height: 48, minWidth: 48, borderRadius: 10, objectFit: 'cover', flexShrink: 0, display: 'block' },
 }
