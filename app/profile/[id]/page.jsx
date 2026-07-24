@@ -34,6 +34,8 @@ export default function ProfilePage() {
   const avatarRef = useRef()
   const router = useRouter()
   const { id } = useParams()
+  const [zipEdit, setZipEdit] = useState('')
+  const [editingZip, setEditingZip] = useState(false)
 
   useEffect(() => {
     const init = async () => {
@@ -50,6 +52,7 @@ export default function ProfilePage() {
       setProfile(prof)
       setLocationInput(prof.location || '')
       setIsOwner(user?.id === id)
+      setZipEdit(prof.zip || '')
 
       const { data: cables } = await supabase
         .from('cables')
@@ -95,6 +98,18 @@ export default function ProfilePage() {
     setProfile(p => ({ ...p, location: locationInput }))
     setEditingLocation(false)
   }
+
+  const handleZipSave = async () => {
+    if (zipEdit.length !== 5) {
+        alert('Please enter a valid 5-digit ZIP code.')
+        return
+    }
+    await supabase.from('profiles')
+        .update({ zip: zipEdit })
+        .eq('id', currentUser.id)
+    setProfile(p => ({ ...p, zip: zipEdit }))
+    setEditingZip(false)
+    }
 
   const handleSearch = () => {
     const params = new URLSearchParams()
@@ -145,22 +160,28 @@ export default function ProfilePage() {
       {/* Profile card */}
       <div style={s.profileCard}>
         <div style={s.avatarWrap}>
-          {profile.avatar_url ? (
-            <Image src={profile.avatar_url} alt={profile.full_name}
-              width={72} height={72}
-              style={{ borderRadius: '50%', objectFit: 'cover' }} />
-          ) : (
+        {profile.avatar_url ? (
+            <div style={s.avatarRect}>
+            <Image
+                src={profile.avatar_url}
+                alt={profile.full_name}
+                fill
+                style={{ objectFit: 'cover' }}
+            />
+            </div>
+        ) : (
             <div style={s.avatarFallback}>{initials}</div>
-          )}
-          {isOwner && (
-            <button style={s.avatarEdit}
-              onClick={() => avatarRef.current.click()}
-              disabled={uploadingAvatar}
-              aria-label="Change profile photo">
-              {uploadingAvatar ? '...' : '✎'}
+        )}
+        {isOwner && (
+            <button
+            style={s.avatarEdit}
+            onClick={() => avatarRef.current.click()}
+            disabled={uploadingAvatar}
+            aria-label="Change profile photo">
+            {uploadingAvatar ? '...' : '✎'}
             </button>
-          )}
-          <input ref={avatarRef} type="file" accept="image/*"
+        )}
+        <input ref={avatarRef} type="file" accept="image/*"
             style={{ display: 'none' }} onChange={handleAvatarUpload} />
         </div>
 
@@ -198,14 +219,30 @@ export default function ProfilePage() {
               <span style={s.statNum}>{txCount}</span>
               <span style={s.statLabel}>Transactions</span>
             </div>
+            {/* ZIP code — owner only */}
             {isOwner && (
-              <>
-                <div style={s.statDivider} />
-                <div style={s.stat}>
-                  <span style={s.statNum}>{profile.zip || '—'}</span>
-                  <span style={s.statLabel}>ZIP code</span>
+            <div style={s.profileMeta}>
+                {editingZip ? (
+                <div style={s.locationEdit}>
+                    <input
+                    style={s.locationInput}
+                    value={zipEdit}
+                    onChange={e => setZipEdit(e.target.value)}
+                    placeholder="5-digit ZIP"
+                    maxLength={5}
+                    />
+                    <button style={s.saveBtn} onClick={handleZipSave}>Save</button>
+                    <button style={s.cancelBtn} onClick={() => setEditingZip(false)}>Cancel</button>
                 </div>
-              </>
+                ) : (
+                <div style={s.locationRow}>
+                    <span style={s.muted}>
+                    📮 ZIP: {profile.zip || 'Not set'}
+                    </span>
+                    <button style={s.editBtn} onClick={() => setEditingZip(true)}>Edit</button>
+                </div>
+                )}
+            </div>
             )}
           </div>
         </div>

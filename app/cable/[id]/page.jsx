@@ -29,6 +29,12 @@ export default function CableDetail() {
       .eq('id', id)
       .single()
 
+    const { data, error } = await supabase
+        .from('cables')
+        .select('*, profiles(full_name, zip, avatar_url)')
+        .eq('id', id)
+        .single()
+
     if (error || !data) {
       router.push('/browse')
       return
@@ -134,14 +140,28 @@ export default function CableDetail() {
 
         {/* Giver card */}
         <div style={{ ...styles.giverCard, cursor: 'pointer' }}
-            onClick={() => router.push(`/profile/${cable.user_id}`)}>
-          <div style={styles.avatar}>
+        onClick={() => router.push(`/profile/${cable.user_id}`)}>
+
+        {/* Replace the avatar div with this */}
+        {giver?.avatar_url ? (
+            <div style={styles.giverAvatarRect}>
+            <Image
+                src={giver.avatar_url}
+                alt={giver.full_name}
+                fill
+                style={{ objectFit: 'cover' }}
+            />
+            </div>
+        ) : (
+            <div style={styles.avatar}>
             {(giver?.full_name || 'A')[0].toUpperCase()}
-          </div>
-          <div>
+            </div>
+        )}
+
+        <div>
             <div style={styles.giverName}>{giver?.full_name || 'Anonymous'}</div>
-            <div style={styles.giverSub}>Cable giver</div>
-          </div>
+            <div style={styles.giverSub}>Tap to view profile →</div>
+        </div>
         </div>
 
         {/* Trust note */}
@@ -195,6 +215,7 @@ const styles = {
   notesLabel: { fontSize: 12, color: '#999', marginBottom: 4, fontWeight: 500 },
   notesText: { fontSize: 14, color: '#444', lineHeight: 1.6 },
   giverCard: { display: 'flex', gap: 12, alignItems: 'center', background: '#f9f9f9', borderRadius: 12, padding: '12px 14px' },
+  giverAvatarRect: { width: 44, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', flexShrink: 0, background: '#e8f5ee'},
   avatar: { width: 42, height: 42, borderRadius: '50%', background: '#cde9d9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 500, color: '#1a5c36', flexShrink: 0 },
   giverName: { fontSize: 15, fontWeight: 500 },
   giverSub: { fontSize: 13, color: '#888' },
