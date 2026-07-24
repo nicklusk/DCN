@@ -129,27 +129,28 @@ function Browse() {
 }
 
 const styles = {
-  page: { maxWidth: 680, margin: '0 auto', padding: '0 16px 40px', fontFamily: 'system-ui, sans-serif', color: 'var(--text-primary)' },
+  page: { maxWidth: 680, margin: '0 auto', padding: '0 16px 40px', fontFamily: 'system-ui, sans-serif' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #eee' },
-  logo: { fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' },
+  logo: { fontSize: 18, fontWeight: 600 },
   green: { color: '#2a7c4f' },
   headerRight: { display: 'flex', gap: 8 },
-  ghostBtn: { background: 'var(--surface-1)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '7px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-primary)' },
+  ghostBtn: { background: 'none', border: '1px solid #ddd', borderRadius: 8, padding: '7px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
+  // ADDED: toast style
   toast: { background: '#e8f5ee', color: '#1a5c36', padding: '12px 16px', borderRadius: 10, fontSize: 14, margin: '12px 0' },
   searchRow: { padding: '16px 0 8px' },
-  zipInput: { padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border-strong)', fontSize: 14, fontFamily: 'inherit', width: '100%', outline: 'none', background: 'var(--surface-2)', color: 'var(--text-primary)' },
+  zipInput: { padding: '10px 14px', borderRadius: 10, border: '1px solid #e5e5e5', fontSize: 14, fontFamily: 'inherit', width: '100%', outline: 'none' },
   filterRow: { display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 0 16px' },
-  chip: { padding: '5px 14px', borderRadius: 20, border: '1px solid var(--border-strong)', background: 'var(--surface-2)', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', color: 'var(--text-primary)' },
+  chip: { padding: '5px 14px', borderRadius: 20, border: '1px solid #e5e5e5', background: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
   chipActive: { padding: '5px 14px', borderRadius: 20, border: '1px solid #2a7c4f', background: '#2a7c4f', color: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
   grid: { display: 'flex', flexDirection: 'column', gap: 10 },
-  card: { background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', gap: 12, cursor: 'pointer', alignItems: 'center' },
+  card: { background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: 14, display: 'flex', gap: 12, cursor: 'pointer', alignItems: 'center' },
   cardImg: { width: 52, height: 52, borderRadius: 10, background: '#e8f5ee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 },
   cardBody: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: 500, marginBottom: 3, color: 'var(--text-primary)' },
-  cardMeta: { fontSize: 13, color: 'var(--text-secondary)', marginBottom: 2 },
+  cardTitle: { fontSize: 15, fontWeight: 500, marginBottom: 3 },
+  cardMeta: { fontSize: 13, color: '#888', marginBottom: 2 },
   cardGiver: { fontSize: 13, color: '#2a7c4f', marginTop: 4 },
   badge: { background: '#e8f5ee', color: '#1a5c36', fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 500 },
-  empty: { textAlign: 'center', color: 'var(--text-secondary)', padding: '60px 0', fontSize: 15 },
+  empty: { textAlign: 'center', color: '#888', padding: '60px 0', fontSize: 15 }
 }
 
 export default function BrowsePage() {
