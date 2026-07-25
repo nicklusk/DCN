@@ -9,6 +9,15 @@ const nextConfig = {
       },
     ],
   },
+    redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/signup',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig
