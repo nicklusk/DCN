@@ -134,17 +134,17 @@ function Browse() {
           {cables.map(cable => (
             <div key={cable.id} style={styles.card}
               onClick={() => router.push(`/cable/${cable.id}`)}>
-            {cable.thumb_url || cable.photo_url ? (
-              <Image
-                src={cable.thumb_url || cable.photo_url}
-                alt={cable.cable_type}
-                width={52}
-                height={52}
-                style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
-              />
-            ) : (
-              <div style={styles.cardImg}>🔌</div>
-            )}
+              {cable.thumb_url || cable.photo_url ? (
+                <Image
+                  src={cable.thumb_url || cable.photo_url}
+                  alt={cable.cable_type}
+                  width={52}
+                  height={52}
+                  style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+                />
+              ) : (
+                <div style={styles.cardImg}>🔌</div>
+              )}
               <div style={styles.cardBody}>
                 <div style={styles.cardTitle}>{cable.cable_type}</div>
                 <div style={styles.cardMeta}>{cable.length} · {cable.condition}</div>

@@ -328,13 +328,15 @@ export default function ProfilePage() {
               <div key={cable.id} style={s.listingCard}
                 onClick={() => router.push(`/cable/${cable.id}`)}>
                 {cable.thumb_url || cable.photo_url ? (
-                  <Image
+                <Image
                     src={cable.thumb_url || cable.photo_url}
                     alt={cable.cable_type}
-                    width={56} height={56}
-                    style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                    width={56}
+                    height={56}
+                    style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+                />
                 ) : (
-                  <div style={s.listingIcon}>🔌</div>
+                <div style={s.listingIcon}>🔌</div>
                 )}
                 <div style={s.listingInfo}>
                   <div style={s.listingType}>{cable.cable_type}</div>
