@@ -11,15 +11,14 @@ function Browse() {
   const [filter, setFilter] = useState('All')
   const [zip, setZip] = useState('')
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [toastMsg, setToastMsg] = useState(null) // ADDED: toast state
+  const [searchText, setSearchText] = useState('') // ADD THIS LINE
   const router = useRouter()
   const searchParams = useSearchParams() // ADDED: searchParams hook
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) router.push('/login')
-      else setUser(data.user)
     })
 
     const q = searchParams.get('q') || ''
@@ -65,16 +64,16 @@ function Browse() {
     setLoading(false)
   }
 
-  const handleFilter = (type) => {
-    setFilter(type)
-    fetchCables(type, zip)
-  }
+    const handleFilter = (type) => {
+      setFilter(type)
+      fetchCables(type, zip, searchText)
+    }
 
-  const handleZip = (e) => {
-    const val = e.target.value
-    setZip(val)
-    fetchCables(filter, val)
-  }
+    const handleZip = (e) => {
+      const val = e.target.value
+      setZip(val)
+      fetchCables(filter, val, searchText)
+    }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -101,8 +100,22 @@ function Browse() {
       )}
 
       <div style={styles.searchRow}>
-        <input style={styles.zipInput} placeholder="Filter by ZIP code"
-          value={zip} onChange={handleZip} maxLength={5} />
+        <input
+          style={styles.zipInput}
+          placeholder="Search cable type or device..."
+          value={searchText}
+          onChange={e => {
+            setSearchText(e.target.value)
+            fetchCables(filter, zip, e.target.value)
+          }}
+        />
+        <input
+          style={{ ...styles.zipInput, marginTop: 8 }}
+          placeholder="Filter by ZIP code"
+          value={zip}
+          onChange={handleZip}
+          maxLength={5}
+        />
       </div>
 
       <div style={styles.filterRow}>
