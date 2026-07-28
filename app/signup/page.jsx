@@ -10,23 +10,52 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const router = useRouter()
+  const [phone, setPhone] = useState('')
+
+  const formatPhone = (raw) => {
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length === 10) return `+1${digits}`
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+    return raw
+  }
 
   const handleSignUp = async () => {
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signUp({
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: name } }
     })
+
     if (error) {
       setError(error.message)
-    } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      router.push(`/profile/${user.id}`)
+      setLoading(false)
+      return
     }
+
+    // User comes directly from the signUp response — no second call needed
+    const user = data.user
+
+    if (!user) {
+      setError('Account created but could not retrieve user. Please log in.')
+      setLoading(false)
+      return
+    }
+
+    if (phone) {
+      await supabase.from('profiles').update({
+        phone: formatPhone(phone),
+        notify_sms: true,
+        notify_email: true,
+      }).eq('id', user.id)
+    }
+
+    router.push(`/profile/${user.id}`)
     setLoading(false)
   }
+
 
   return (
     <div style={styles.container}>
@@ -35,6 +64,14 @@ export default function SignUp() {
       <div style={styles.card}>
         <input style={styles.input} placeholder="Your name" value={name}
           onChange={e => setName(e.target.value)} />
+        <input style={styles.input} placeholder="Phone number (optional — for SMS alerts)"
+          type="tel" value={phone}
+          onChange={e => setPhone(e.target.value)} />
+          {phone && (
+            <p style={styles.hint}>
+              You'll get a text when someone reserves your cable. Standard rates apply.
+            </p>
+          )}
         <input style={styles.input} placeholder="Email" type="email" value={email}
           onChange={e => setEmail(e.target.value)} />
         <input style={styles.input} placeholder="Password" type="password" value={password}
@@ -57,5 +94,6 @@ const styles = {
   card: { background: '#fff', border: '1px solid #e5e5e5', borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', gap: 12 },
   input: { padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e5e5', fontSize: 15, fontFamily: 'inherit', outline: 'none', color: 'var(--text-primary)' },  btn: { background: '#2a7c4f', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
   error: { color: '#c0392b', fontSize: 13 },
-  link: { textAlign: 'center', fontSize: 13, color: '#666' }
+  link: { textAlign: 'center', fontSize: 13, color: '#666' },
+  hint: { fontSize: 12, color: '#888', marginTop: -6 },
 }

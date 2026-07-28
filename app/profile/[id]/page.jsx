@@ -334,7 +334,7 @@ export default function ProfilePage() {
               onChange={async e => {
                 await supabase.from('profiles')
                   .update({ notify_email: e.target.checked })
-                  .eq('id', user.id)
+                  .eq('id', currentUser.id)
                 setProfile(p => ({ ...p, notify_email: e.target.checked }))
               }}
             />
@@ -346,7 +346,7 @@ export default function ProfilePage() {
               onChange={async e => {
                 await supabase.from('profiles')
                   .update({ notify_sms: e.target.checked })
-                  .eq('id', user.id)
+                  .eq('id', currentUser.id)
                 setProfile(p => ({ ...p, notify_sms: e.target.checked }))
               }}
             />
@@ -361,7 +361,7 @@ export default function ProfilePage() {
               onBlur={async e => {
                 await supabase.from('profiles')
                   .update({ phone: e.target.value })
-                  .eq('id', user.id)
+                  .eq('id', currentUser.id)
               }}
             />
           )}

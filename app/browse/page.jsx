@@ -86,6 +86,7 @@ function Browse() {
         <span style={styles.logo}>Dollar Cable <span style={styles.green}>Neighbor</span></span>
         <div style={styles.headerRight}>
           <button style={styles.ghostBtn} onClick={() => router.push('/my-cables')}>My cables</button>
+          <button style={styles.ghostBtn} onClick={() => router.push('/messages')}>Messages</button>
           <button style={styles.ghostBtn} onClick={() => router.push('/post')}>+ Post</button>
           <button style={styles.ghostBtn} onClick={() => router.push('/cables')}>Cable guide</button>
           <button style={styles.ghostBtn} onClick={handleLogout}>Log out</button>
