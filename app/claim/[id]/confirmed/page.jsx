@@ -213,6 +213,11 @@ const handleConfirm = async () => {
           </div>
         )}
 
+        <button style={styles.confirmBtn}
+          onClick={() => router.push(`/messages?with=${cable?.user_id}`)}>
+          Message {giver?.full_name?.split(' ')[0]} about pickup →
+        </button>
+
         {/* Confirmation status */}
         {!bothConfirmed && (
           <div style={styles.confirmStatus}>

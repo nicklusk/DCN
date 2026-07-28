@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { notifyGiver } from '@/lib/notify'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
@@ -44,6 +45,21 @@ export async function POST(req) {
         cable_type: cable.cable_type,
       }
     })
+
+    // Add this after the PaymentIntent is created, before the return
+    const { data: giver } = await supabase
+      .from('profiles')
+      .select('full_name, email, phone, notify_email, notify_sms')
+      .eq('id', cable.user_id)
+      .single()
+
+    const { data: claimer } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single()
+
+    await notifyGiver({ giver, cable, claimer })
 
     return NextResponse.json({ clientSecret: paymentIntent.client_secret })
 

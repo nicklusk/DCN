@@ -164,8 +164,15 @@ export default function ProfilePage() {
       <div style={s.header}>
         <button style={s.backBtn} onClick={() => router.push('/browse')}>← Browse</button>
         {isOwner && (
-          <button style={s.ghostBtn} onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}>
+          <button style={s.ghostBtn} 
+            onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}>
             Log out
+          </button>
+        )}
+        {!isOwner && (
+          <button style={s.ghostBtn}
+            onClick={() => router.push(`/messages?with=${id}`)}>
+            Message {profile.full_name?.split(' ')[0]} →
           </button>
         )}
       </div>
@@ -317,6 +324,50 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {isOwner && (
+        <div style={s.notifySection}>
+          <p style={s.sectionLabel}>Notifications</p>
+          <div style={s.notifyRow}>
+            <span style={s.muted}>Email alerts</span>
+            <input type="checkbox"
+              checked={profile.notify_email || false}
+              onChange={async e => {
+                await supabase.from('profiles')
+                  .update({ notify_email: e.target.checked })
+                  .eq('id', user.id)
+                setProfile(p => ({ ...p, notify_email: e.target.checked }))
+              }}
+            />
+          </div>
+          <div style={s.notifyRow}>
+            <span style={s.muted}>SMS alerts (requires phone number)</span>
+            <input type="checkbox"
+              checked={profile.notify_sms || false}
+              onChange={async e => {
+                await supabase.from('profiles')
+                  .update({ notify_sms: e.target.checked })
+                  .eq('id', user.id)
+                setProfile(p => ({ ...p, notify_sms: e.target.checked }))
+              }}
+            />
+          </div>
+          {profile.notify_sms && (
+            <input style={s.locationInput}
+              placeholder="Phone number e.g. +15551234567"
+              value={profile.phone || ''}
+              onChange={async e => {
+                setProfile(p => ({ ...p, phone: e.target.value }))
+              }}
+              onBlur={async e => {
+                await supabase.from('profiles')
+                  .update({ phone: e.target.value })
+                  .eq('id', user.id)
+              }}
+            />
+          )}
+        </div>
+      )}
+
       {/* Active listings */}
       {listings.length > 0 && (
         <div style={s.section}>
@@ -419,4 +470,6 @@ const s = {
   quickLinks: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 },
   quickLink: { background: 'none', border: '1px solid #e5e5e5', borderRadius: 10, padding: '10px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-primary)' },
   muted: { color: 'var(--text-secondary)', fontSize: 14 },
+  notifySection: { marginTop: 8 },
+  notifyRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)', fontSize: 14 },
 }
