@@ -5,17 +5,23 @@ import { notifyGiver } from '@/lib/notify'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
-// Server-side Supabase client using service role key
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
 export async function POST(req) {
   try {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json({ error: 'Missing Stripe key' }, { status: 500 })
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ error: 'Missing service role key' }, { status: 500 })
+    }
+
     const { cableId, userId } = await req.json()
 
-    // Verify the cable exists and is still available
     const { data: cable, error } = await supabase
       .from('cables')
       .select('id, cable_type, status, user_id')
@@ -25,20 +31,17 @@ export async function POST(req) {
     if (error || !cable) {
       return NextResponse.json({ error: 'Cable not found' }, { status: 404 })
     }
-
     if (cable.status !== 'available') {
       return NextResponse.json({ error: 'Cable is no longer available' }, { status: 400 })
     }
-
     if (cable.user_id === userId) {
       return NextResponse.json({ error: 'You cannot claim your own cable' }, { status: 400 })
     }
 
-    // Create a PaymentIntent for $1.00, not captured yet
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: 100, // $1.00 in cents
+      amount: 100,
       currency: 'usd',
-      capture_method: 'manual', // holds the charge, captures only on confirmation
+      capture_method: 'manual',
       metadata: {
         cable_id: cableId,
         claimer_id: userId,
@@ -46,20 +49,24 @@ export async function POST(req) {
       }
     })
 
-    // Add this after the PaymentIntent is created, before the return
-    const { data: giver } = await supabase
-      .from('profiles')
-      .select('full_name, email, phone, notify_email, notify_sms')
-      .eq('id', cable.user_id)
-      .single()
+    // Fetch giver and claimer profiles for notification
+    const [{ data: giver }, { data: claimer }] = await Promise.all([
+      supabase.from('profiles')
+        .select('full_name, email, phone, notify_email, notify_sms')
+        .eq('id', cable.user_id)
+        .single(),
+      supabase.from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single(),
+    ])
 
-    const { data: claimer } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', userId)
-      .single()
-
-    await notifyGiver({ giver, cable, claimer })
+    // Fire notification — don't await so it doesn't slow down the payment response
+    if (giver && claimer) {
+      notifyGiver({ giver, cable, claimer }).catch(err =>
+        console.error('Notification error:', err)
+      )
+    }
 
     return NextResponse.json({ clientSecret: paymentIntent.client_secret })
 

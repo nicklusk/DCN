@@ -1,20 +1,32 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function NotificationListener() {
   const [toast, setToast] = useState(null)
+  const router = useRouter()
 
   useEffect(() => {
-    let userId = null
     let channel = null
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    const setup = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      userId = user.id
+
+      // Get all cables owned by this user so we can check incoming claims
+      const { data: myCables } = await supabase
+        .from('cables')
+        .select('id, cable_type')
+        .eq('user_id', user.id)
+
+      if (!myCables || myCables.length === 0) return
+
+      const myCableMap = {}
+      myCables.forEach(c => { myCableMap[c.id] = c.cable_type })
 
       channel = supabase
-        .channel(`claims-notify-${userId}`)
+        .channel(`notify-claims-${user.id}`)
         .on(
           'postgres_changes',
           {
@@ -22,49 +34,62 @@ export default function NotificationListener() {
             schema: 'public',
             table: 'claims',
           },
-          async (payload) => {
-            const { data: cable } = await supabase
-              .from('cables')
-              .select('cable_type, user_id')
-              .eq('id', payload.new.cable_id)
-              .single()
-
-            if (cable?.user_id === userId) {
-              setToast(`Someone reserved your ${cable.cable_type}! Go to My Cables to confirm.`)
-              setTimeout(() => setToast(null), 8000)
+          (payload) => {
+            const cableType = myCableMap[payload.new.cable_id]
+            if (cableType) {
+              setToast(`Someone reserved your ${cableType}! Tap to confirm.`)
             }
           }
         )
         .subscribe()
-    })
+    }
 
-    return () => { if (channel) supabase.removeChannel(channel) }
+    setup()
+
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [])
 
   if (!toast) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: 24,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      background: '#2a7c4f',
-      color: '#fff',
-      padding: '14px 20px',
-      borderRadius: 12,
-      fontSize: 14,
-      fontFamily: 'system-ui, sans-serif',
-      maxWidth: 360,
-      textAlign: 'center',
-      lineHeight: 1.5,
-      zIndex: 9999,
-      boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-      cursor: 'pointer',
-    }}
-      onClick={() => window.location.href = '/my-cables'}
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#2a7c4f',
+        color: '#fff',
+        padding: '14px 20px',
+        borderRadius: 12,
+        fontSize: 14,
+        fontFamily: 'system-ui, sans-serif',
+        maxWidth: 360,
+        width: 'calc(100% - 32px)',
+        textAlign: 'center',
+        lineHeight: 1.5,
+        zIndex: 9999,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        justifyContent: 'center',
+      }}
+      onClick={() => {
+        setToast(null)
+        router.push('/my-cables')
+      }}
     >
-      🔔 {toast}
+      <span style={{ fontSize: 20 }}>🔔</span>
+      <span>{toast}</span>
+      <span
+        style={{ marginLeft: 'auto', opacity: 0.7, fontSize: 18, cursor: 'pointer' }}
+        onClick={e => { e.stopPropagation(); setToast(null) }}
+      >
+        ×
+      </span>
     </div>
   )
 }
