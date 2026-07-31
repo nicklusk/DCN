@@ -1,9 +1,8 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Image from 'next/image'
-import { Suspense } from 'react'
 
 function MessagesInner() {
   const [user, setUser] = useState(null)
@@ -17,40 +16,7 @@ function MessagesInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setUser(user)
-      await fetchConversations(user.id)
-
-      const withUserId = searchParams.get('with')
-      if (withUserId) openConversation(withUserId, user.id)
-
-      setLoading(false)
-
-      const channel = supabase
-        .channel(`messages-${user.id}`)
-        .on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'messages' },
-          (payload) => {
-            if (payload.new.recipient_id === user.id ||
-                payload.new.sender_id === user.id) {
-              fetchConversations(user.id)
-              if (activeConvo) fetchMessages(user.id, activeConvo.other_user_id)
-            }
-          }
-        )
-        .subscribe()
-
-      return () => supabase.removeChannel(channel)
-    }
-    init()
-  }, [])
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  // Functions declared BEFORE the useEffect that references them
 
   const fetchConversations = async (userId) => {
     const { data } = await supabase
@@ -80,6 +46,16 @@ function MessagesInner() {
     setConversations(convos)
   }
 
+  const fetchMessages = async (userId, otherUserId) => {
+    const { data } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${userId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${userId})`)
+      .order('created_at', { ascending: true })
+
+    setMessages(data || [])
+  }
+
   const openConversation = async (otherUserId, userId) => {
     const { data: otherUser } = await supabase
       .from('profiles')
@@ -97,15 +73,58 @@ function MessagesInner() {
       .eq('recipient_id', userId || user?.id)
   }
 
-  const fetchMessages = async (userId, otherUserId) => {
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-      .or(`and(sender_id.eq.${userId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${userId})`)
-      .order('created_at', { ascending: true })
+  useEffect(() => {
+    let channel = null
+    let mounted = true
 
-    setMessages(data || [])
-  }
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !mounted) return
+      setUser(user)
+      await fetchConversations(user.id)
+
+      const withUserId = searchParams.get('with')
+      if (withUserId) openConversation(withUserId, user.id)
+
+      setLoading(false)
+
+      const channelName = `messages-${user.id}-${Math.random()}`
+      channel = supabase.channel(channelName)
+
+      channel
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          (payload) => {
+            if (!mounted) return
+            if (payload.new.recipient_id === user.id ||
+                payload.new.sender_id === user.id) {
+              fetchConversations(user.id)
+              setActiveConvo(current => {
+                if (current && (payload.new.sender_id === current.other_user_id ||
+                                 payload.new.recipient_id === current.other_user_id)) {
+                  fetchMessages(user.id, current.other_user_id)
+                }
+                return current
+              })
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('Messages subscription status:', status)
+        })
+    }
+
+    init()
+
+    return () => {
+      mounted = false
+      if (channel) supabase.removeChannel(channel)
+    }
+  }, [])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !activeConvo || sending) return
@@ -152,7 +171,7 @@ function MessagesInner() {
           {conversations.length === 0 ? (
             <div style={s.emptyConvo}>
               <p style={s.muted}>No messages yet.</p>
-              <p style={s.muted} >Reserve a cable to start a conversation.</p>
+              <p style={s.muted}>Reserve a cable to start a conversation.</p>
             </div>
           ) : (
             conversations.map(convo => (

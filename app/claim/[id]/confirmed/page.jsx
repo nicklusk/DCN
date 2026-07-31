@@ -7,11 +7,11 @@ export default function Confirmed() {
   const [cable, setCable] = useState(null)
   const [giver, setGiver] = useState(null)
   const [claim, setClaim] = useState(null)
-  const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const router = useRouter()
   const { id } = useParams()
+  const [hoursLeft, setHoursLeft] = useState(72)
 
 useEffect(() => {
   let pollInterval = null  // declared here, not inside init
@@ -20,7 +20,7 @@ useEffect(() => {
  const init = async () => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !mounted) return
-  setUser(user)
+
 
   console.log('Confirmed page init — cable id:', id, 'user:', user.id)
 
@@ -108,6 +108,8 @@ useEffect(() => {
   if (mounted) {
     setClaim(claim)
     setLoading(false)
+    const expiresAt = new Date(claim.expires_at)
+    setHoursLeft(Math.max(0, Math.round((expiresAt - Date.now()) / 1000 / 60 / 60)))
   }
 
   // Poll every 5 seconds for giver confirmation
@@ -138,10 +140,11 @@ useEffect(() => {
       .maybeSingle()
 
     if (updatedClaim && mounted) {
-      console.log('Poll — giver_confirmed:', updatedClaim.giver_confirmed,
-        'claimer_confirmed:', updatedClaim.claimer_confirmed)
       setClaim(updatedClaim)
+      const expiresAt = new Date(updatedClaim.expires_at)
+      setHoursLeft(Math.max(0, Math.round((expiresAt - Date.now()) / 1000 / 60 / 60)))
     }
+
   }, 5000)
 }
 
@@ -151,7 +154,7 @@ useEffect(() => {
     mounted = false
     if (pollInterval) clearInterval(pollInterval)
   }
-}, [id])
+}, [id, router])
 
   const handleConfirm = async () => {
     if (!claim) return
@@ -174,6 +177,8 @@ useEffect(() => {
 
     if (!updated) return
     setClaim(updated)
+    const expiresAt = new Date(updated.expires_at)
+    setHoursLeft(Math.max(0, Math.round((expiresAt - Date.now()) / 1000 / 60 / 60)))
 
     if (updated.giver_confirmed && updated.claimer_confirmed) {
       const res = await fetch('/api/capture-payment', {
@@ -205,10 +210,6 @@ useEffect(() => {
     </div>
   )
 
-  const expiresAt = claim ? new Date(claim.expires_at) : null
-  const hoursLeft = expiresAt
-    ? Math.max(0, Math.round((expiresAt - Date.now()) / 1000 / 60 / 60))
-    : 72
 
   const bothConfirmed = claim?.giver_confirmed && claim?.claimer_confirmed
   const claimerConfirmed = claim?.claimer_confirmed
@@ -303,7 +304,7 @@ useEffect(() => {
 
         {claimerConfirmed && !bothConfirmed && (
           <div style={styles.waitingNote}>
-            You've confirmed! Waiting on {giver?.full_name || 'the giver'} to confirm their side.
+            You&apos;ve confirmed! Waiting on {giver?.full_name || 'the giver'} to confirm their side.
           </div>
         )}
 

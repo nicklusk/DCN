@@ -11,7 +11,7 @@ export default function Landing() {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) router.push(`/profile/${data.user.id}`)
     })
-  }, [])
+  }, [router])
 
   return (
     <div style={s.page}>
@@ -33,10 +33,10 @@ export default function Landing() {
       <div style={s.hero}>
         <div style={s.eyebrow}>Free to list · $1 to claim</div>
         <h1 style={s.h1}>
-          The cable you need is probably in someone's drawer right now
+          The cable you need is probably in someone&apos;s drawer right now
         </h1>
         <p style={s.heroSub}>
-          Dollar Cable Neighbor connects people who have cables they'll never
+          Dollar Cable Neighbor connects people who have cables they&apos;ll never
           use with neighbors who need exactly that cable — today.
         </p>
         <div style={s.heroBtns}>
@@ -137,7 +137,7 @@ export default function Landing() {
           infrastructure used by Amazon, Shopify, and millions of other
           businesses. The charge is held, not captured, until both the giver
           and claimer confirm the handoff. If something goes wrong, the hold
-          is released and you're not charged. Repeated no-shows result in
+          is released and you&apos;re not charged. Repeated no-shows result in
           account suspension.
         </p>
       </div>

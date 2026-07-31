@@ -69,7 +69,7 @@ export default function SignUp() {
           onChange={e => setPhone(e.target.value)} />
           {phone && (
             <p style={styles.hint}>
-              You'll get a text when someone reserves your cable. Standard rates apply.
+              You&apos;ll get a text when someone reserves your cable. Standard rates apply.
             </p>
           )}
         <input style={styles.input} placeholder="Email" type="email" value={email}
