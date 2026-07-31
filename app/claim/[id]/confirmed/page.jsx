@@ -9,6 +9,7 @@ export default function Confirmed() {
   const [claim, setClaim] = useState(null)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const router = useRouter()
   const { id } = useParams()
 
@@ -21,12 +22,21 @@ export default function Confirmed() {
       if (!user || !mounted) return
       setUser(user)
 
-      const { data: cable } = await supabase
+      // Fetch cable — use maybeSingle so missing cable doesn't throw
+      const { data: cable, error: cableError } = await supabase
         .from('cables')
         .select('*, profiles(full_name)')
         .eq('id', id)
-        .single()
+        .maybeSingle()
 
+      if (cableError) {
+        console.error('Cable fetch error:', cableError)
+        if (mounted) setError('Could not load cable details.')
+        if (mounted) setLoading(false)
+        return
+      }
+
+      // Cable gone — transaction already completed
       if (!cable) {
         if (mounted) router.push('/browse?completed=true')
         return
@@ -37,18 +47,27 @@ export default function Confirmed() {
         setGiver(cable.profiles)
       }
 
-      const { data: claim } = await supabase
+      // Fetch claim
+      const { data: claim, error: claimError } = await supabase
         .from('claims')
         .select('*')
         .eq('cable_id', id)
         .eq('claimer_id', user.id)
-        .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
+      if (claimError) {
+        console.error('Claim fetch error:', claimError)
+        if (mounted) setError('Could not load claim details.')
+        if (mounted) setLoading(false)
+        return
+      }
+
+      // No claim found — something went wrong
       if (!claim) {
-        if (mounted) router.push('/browse?completed=true')
+        if (mounted) setError('No active claim found for this cable.')
+        if (mounted) setLoading(false)
         return
       }
 
@@ -57,96 +76,93 @@ export default function Confirmed() {
         setLoading(false)
       }
 
-      // Single interval — only poll if not already both confirmed
+      // Poll every 5 seconds for giver confirmation
       pollInterval = setInterval(async () => {
         if (!mounted) return
 
-        // Check if cable still exists
         const { data: cableCheck } = await supabase
           .from('cables')
           .select('id')
           .eq('id', id)
           .maybeSingle()
 
+        // Cable deleted = both confirmed, transaction done
         if (!cableCheck) {
           clearInterval(pollInterval)
           if (mounted) router.push('/browse?completed=true')
           return
         }
 
-        // Check latest claim state
         const { data: updatedClaim } = await supabase
           .from('claims')
           .select('*')
           .eq('cable_id', id)
           .eq('claimer_id', user.id)
-          .eq('status', 'pending')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
 
-        if (!updatedClaim) {
-          clearInterval(pollInterval)
-          if (mounted) router.push('/browse?completed=true')
-          return
-        }
-
-        if (mounted) setClaim(updatedClaim)
+        if (updatedClaim && mounted) setClaim(updatedClaim)
       }, 5000)
     }
 
     init()
 
-    // Cleanup on unmount — stops polling
     return () => {
       mounted = false
       if (pollInterval) clearInterval(pollInterval)
     }
-  }, [id]) // Only run when id changes
+  }, [id])
 
-const handleConfirm = async () => {
-  if (!claim) return
+  const handleConfirm = async () => {
+    if (!claim) return
 
-  // Update claimer confirmation
-  const { error } = await supabase
-    .from('claims')
-    .update({ claimer_confirmed: true })
-    .eq('id', claim.id)
+    const { error } = await supabase
+      .from('claims')
+      .update({ claimer_confirmed: true })
+      .eq('id', claim.id)
 
-  if (error) {
-    alert('Something went wrong. Try again.')
-    return
-  }
-
-  // Re-fetch the claim to get the latest state from the server
-  const { data: updated } = await supabase
-    .from('claims')
-    .select('*')
-    .eq('id', claim.id)
-    .single()
-
-  setClaim(updated)
-
-  if (updated.giver_confirmed && updated.claimer_confirmed) {
-    // Both confirmed — trigger capture
-    const res = await fetch('/api/capture-payment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ claimId: claim.id })
-    })
-    const data = await res.json()
-    if (data.error) {
-      alert('Payment capture failed: ' + data.error)
+    if (error) {
+      alert('Something went wrong. Try again.')
       return
     }
-    router.push('/browse?completed=true')
+
+    const { data: updated } = await supabase
+      .from('claims')
+      .select('*')
+      .eq('id', claim.id)
+      .maybeSingle()
+
+    if (!updated) return
+    setClaim(updated)
+
+    if (updated.giver_confirmed && updated.claimer_confirmed) {
+      const res = await fetch('/api/capture-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId: claim.id })
+      })
+      const data = await res.json()
+      if (data.error) {
+        alert('Payment capture failed: ' + data.error)
+        return
+      }
+      router.push('/browse?completed=true')
+    }
   }
-  // If giver hasn't confirmed yet, the UI updates to show waiting state
-}
 
   if (loading) return (
     <div style={styles.centered}>
       <p style={styles.loadingText}>Loading your claim...</p>
+    </div>
+  )
+
+  if (error) return (
+    <div style={styles.centered}>
+      <p style={styles.errorBox}>{error}</p>
+      <button style={styles.cta} onClick={() => router.push('/browse')}>
+        Back to browse
+      </button>
     </div>
   )
 
@@ -162,53 +178,52 @@ const handleConfirm = async () => {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <span style={styles.logo}>Dollar Cable <span style={styles.green}>Neighbor</span></span>
+        <span style={styles.logo}>
+          Dollar Cable <span style={styles.green}>Neighbor</span>
+        </span>
       </div>
 
       <div style={styles.body}>
-
-        {/* Status icon */}
         <div style={styles.iconWrap}>
           <span style={styles.icon}>{bothConfirmed ? '🎉' : '✅'}</span>
         </div>
 
-        {/* Title */}
         <h1 style={styles.title}>
           {bothConfirmed ? 'Transaction complete!' : 'Cable reserved!'}
         </h1>
 
-        {/* Subtitle */}
         <p style={styles.subtitle}>
           {bothConfirmed
             ? 'Your $1 has been processed. Enjoy your cable!'
-            : `Your $1 is being held securely. Arrange pickup with ${giver?.full_name || 'the giver'}, then both of you confirm the handoff below.`
+            : `Your $1 is being held securely. Arrange pickup with ${giver?.full_name || 'the giver'}, then both confirm the handoff below.`
           }
         </p>
 
-        {/* Timer */}
         {!bothConfirmed && (
           <div style={styles.timerPill}>
             ⏱ Auto-releases in {hoursLeft} hours
           </div>
         )}
 
-        {/* Cable summary */}
         <div style={styles.cableCard}>
           <span style={styles.cableIcon}>🔌</span>
           <div>
             <div style={styles.cableType}>{cable?.cable_type}</div>
-            <div style={styles.cableMeta}>{cable?.length} · {cable?.condition}</div>
-            <div style={styles.cableGiver}>From {giver?.full_name || 'Anonymous'}</div>
+            <div style={styles.cableMeta}>
+              {cable?.length} · {cable?.condition}
+            </div>
+            <div style={styles.cableGiver}>
+              From {giver?.full_name || 'Anonymous'}
+            </div>
           </div>
         </div>
 
-        {/* Steps */}
         {!bothConfirmed && (
           <div style={styles.steps}>
             <div style={styles.step}>
               <div style={styles.stepNum}>1</div>
               <div style={styles.stepText}>
-                Message {giver?.full_name || 'the giver'} to arrange a pickup time and place
+                Message {giver?.full_name || 'the giver'} to arrange pickup
               </div>
             </div>
             <div style={styles.step}>
@@ -218,18 +233,12 @@ const handleConfirm = async () => {
             <div style={styles.step}>
               <div style={styles.stepNum}>3</div>
               <div style={styles.stepText}>
-                Both of you tap "Confirm handoff" — your $1 processes and the listing closes
+                Both tap confirm — your $1 processes and the listing closes
               </div>
             </div>
           </div>
         )}
 
-        <button style={styles.confirmBtn}
-          onClick={() => router.push(`/messages?with=${cable?.user_id}`)}>
-          Message {giver?.full_name?.split(' ')[0]} about pickup →
-        </button>
-
-        {/* Confirmation status */}
         {!bothConfirmed && (
           <div style={styles.confirmStatus}>
             <div style={styles.confirmRow}>
@@ -247,9 +256,8 @@ const handleConfirm = async () => {
           </div>
         )}
 
-        {/* Action buttons */}
         {!bothConfirmed && !claimerConfirmed && (
-          <button style={styles.confirmBtn} onClick={handleConfirm}>
+          <button style={styles.cta} onClick={handleConfirm}>
             Confirm I received the cable ✓
           </button>
         )}
@@ -261,19 +269,25 @@ const handleConfirm = async () => {
         )}
 
         {bothConfirmed && (
-          <button style={styles.confirmBtn} onClick={() => router.push('/browse')}>
+          <button style={styles.cta} onClick={() => router.push('/browse')}>
             Back to browse →
           </button>
         )}
+
+        <button
+          style={styles.ghostBtn}
+          onClick={() => router.push(`/messages?with=${cable?.user_id}`)}>
+          Message {giver?.full_name?.split(' ')[0] || 'giver'} about pickup →
+        </button>
 
         <button style={styles.ghostBtn} onClick={() => router.push('/browse')}>
           Back to browse
         </button>
 
-        <p style={styles.disputeLink} onClick={() => alert('Dispute flow coming in a future update.')}>
+        <p style={styles.disputeLink}
+          onClick={() => alert('Dispute flow coming soon.')}>
           Report a problem
         </p>
-
       </div>
     </div>
   )
@@ -281,31 +295,32 @@ const handleConfirm = async () => {
 
 const styles = {
   page: { maxWidth: 480, margin: '0 auto', padding: '0 16px 60px', fontFamily: 'system-ui, sans-serif' },
-  centered: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', fontFamily: 'system-ui, sans-serif' },
+  centered: { maxWidth: 480, margin: '80px auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' },
   loadingText: { color: '#888', fontSize: 15 },
-  header: { padding: '16px 0', borderBottom: '1px solid #eee', marginBottom: 24 },
-  logo: { fontSize: 18, fontWeight: 600 },
+  header: { padding: '16px 0', borderBottom: '1px solid var(--border)', marginBottom: 24 },
+  logo: { fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' },
   green: { color: '#2a7c4f' },
   body: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' },
   iconWrap: { width: 72, height: 72, borderRadius: '50%', background: '#e8f5ee', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   icon: { fontSize: 36 },
-  title: { fontSize: 22, fontWeight: 500, color: '#111' },
-  subtitle: { fontSize: 15, color: '#555', lineHeight: 1.6, maxWidth: 360 },
+  title: { fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' },
+  subtitle: { fontSize: 15, color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: 360 },
   timerPill: { background: '#fef3e2', color: '#7c4f0f', borderRadius: 20, padding: '6px 16px', fontSize: 13 },
-  cableCard: { display: 'flex', gap: 12, alignItems: 'center', background: '#f9f9f9', borderRadius: 12, padding: '14px 16px', width: '100%', textAlign: 'left' },
+  cableCard: { display: 'flex', gap: 12, alignItems: 'center', background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', width: '100%', textAlign: 'left' },
   cableIcon: { fontSize: 32, width: 48, height: 48, background: '#e8f5ee', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  cableType: { fontSize: 15, fontWeight: 500 },
-  cableMeta: { fontSize: 13, color: '#888', marginTop: 2 },
+  cableType: { fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' },
+  cableMeta: { fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 },
   cableGiver: { fontSize: 13, color: '#2a7c4f', marginTop: 4 },
-  steps: { background: '#f9f9f9', borderRadius: 12, padding: '14px 16px', width: '100%', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12 },
+  steps: { background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', width: '100%', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12 },
   step: { display: 'flex', gap: 10, alignItems: 'flex-start' },
   stepNum: { width: 22, height: 22, borderRadius: '50%', background: '#2a7c4f', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
-  stepText: { fontSize: 13, color: '#555', lineHeight: 1.5 },
-  confirmStatus: { background: '#f9f9f9', borderRadius: 12, padding: '14px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 },
-  confirmRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 },
-  confirmLabel: { fontSize: 13, color: '#888' },
-  confirmBtn: { background: '#2a7c4f', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' },
+  stepText: { fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 },
+  confirmStatus: { background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 },
+  confirmRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, color: 'var(--text-primary)' },
+  confirmLabel: { fontSize: 13, color: 'var(--text-secondary)' },
+  cta: { background: '#2a7c4f', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' },
   waitingNote: { background: '#e8f5ee', color: '#1a5c36', borderRadius: 10, padding: '12px 16px', fontSize: 14, lineHeight: 1.5, width: '100%' },
-  ghostBtn: { background: 'none', border: '1px solid #ddd', borderRadius: 10, padding: '10px 20px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', color: '#555' },
-  disputeLink: { fontSize: 13, color: '#999', cursor: 'pointer', textDecoration: 'underline' },
+  ghostBtn: { background: 'none', border: '1px solid var(--border-strong)', borderRadius: 10, padding: '10px 20px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-primary)', width: '100%' },
+  disputeLink: { fontSize: 13, color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' },
+  errorBox: { color: '#c0392b', fontSize: 14, background: '#fdf0f0', padding: '14px 16px', borderRadius: 10, textAlign: 'center', width: '100%' },
 }
