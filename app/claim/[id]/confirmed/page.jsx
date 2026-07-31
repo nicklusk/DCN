@@ -13,9 +13,9 @@ export default function Confirmed() {
   const router = useRouter()
   const { id } = useParams()
 
-  useEffect(() => {
-    let pollInterval = null
-    let mounted = true
+useEffect(() => {
+  let pollInterval = null  // declared here, not inside init
+  let mounted = true
 
  const init = async () => {
   const { data: { user } } = await supabase.auth.getUser()
@@ -145,13 +145,13 @@ export default function Confirmed() {
   }, 5000)
 }
 
-    init()
+  init()
 
-    return () => {
-      mounted = false
-      if (pollInterval) clearInterval(pollInterval)
-    }
-  }, [id])
+  return () => {
+    mounted = false
+    if (pollInterval) clearInterval(pollInterval)
+  }
+}, [id])
 
   const handleConfirm = async () => {
     if (!claim) return
