@@ -54,11 +54,22 @@ function ClaimForm({ cable, user, onSuccess }) {
         expires_at: expiresAt,
       })
 
+      console.log('Claim insert result — error:', claimError)
+
       if (claimError) {
         setError('Payment went through but claim failed to save. Please contact support with payment ID: ' + paymentIntent.id)
         setLoading(false)
         return
       }
+      
+      // Log cable status update
+      const { error: statusError } = await supabase.rpc('update_cable_status', {
+        cable_id_input: cable.id,
+        status_input: 'reserved'
+      })
+      console.log('Cable status update error:', statusError)
+
+
 
       // Mark cable as reserved
       await supabase.rpc('update_cable_status', {

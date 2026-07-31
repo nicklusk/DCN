@@ -17,94 +17,133 @@ export default function Confirmed() {
     let pollInterval = null
     let mounted = true
 
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !mounted) return
-      setUser(user)
+ const init = async () => {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !mounted) return
+  setUser(user)
 
-      // Fetch cable — use maybeSingle so missing cable doesn't throw
-      const { data: cable, error: cableError } = await supabase
-        .from('cables')
-        .select('*, profiles(full_name)')
-        .eq('id', id)
-        .maybeSingle()
+  console.log('Confirmed page init — cable id:', id, 'user:', user.id)
 
-      if (cableError) {
-        console.error('Cable fetch error:', cableError)
-        if (mounted) setError('Could not load cable details.')
-        if (mounted) setLoading(false)
-        return
-      }
+  // Retry fetching cable up to 5 times with 1s delay
+  // Needed because the RPC status update may not be committed yet
+  let cable = null
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
-      // Cable gone — transaction already completed
-      if (!cable) {
-        if (mounted) router.push('/browse?completed=true')
-        return
-      }
+    const { data, error } = await supabase
+      .from('cables')
+      .select('*, profiles(full_name)')
+      .eq('id', id)
+      .maybeSingle()
 
-      if (mounted) {
-        setCable(cable)
-        setGiver(cable.profiles)
-      }
+    console.log(`Cable fetch attempt ${attempt}:`, data, error)
 
-      // Fetch claim
-      const { data: claim, error: claimError } = await supabase
-        .from('claims')
-        .select('*')
-        .eq('cable_id', id)
-        .eq('claimer_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (claimError) {
-        console.error('Claim fetch error:', claimError)
-        if (mounted) setError('Could not load claim details.')
-        if (mounted) setLoading(false)
-        return
-      }
-
-      // No claim found — something went wrong
-      if (!claim) {
-        if (mounted) setError('No active claim found for this cable.')
-        if (mounted) setLoading(false)
-        return
-      }
-
-      if (mounted) {
-        setClaim(claim)
-        setLoading(false)
-      }
-
-      // Poll every 5 seconds for giver confirmation
-      pollInterval = setInterval(async () => {
-        if (!mounted) return
-
-        const { data: cableCheck } = await supabase
-          .from('cables')
-          .select('id')
-          .eq('id', id)
-          .maybeSingle()
-
-        // Cable deleted = both confirmed, transaction done
-        if (!cableCheck) {
-          clearInterval(pollInterval)
-          if (mounted) router.push('/browse?completed=true')
-          return
-        }
-
-        const { data: updatedClaim } = await supabase
-          .from('claims')
-          .select('*')
-          .eq('cable_id', id)
-          .eq('claimer_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (updatedClaim && mounted) setClaim(updatedClaim)
-      }, 5000)
+    if (data) {
+      cable = data
+      break
     }
+
+    // If we get an error other than not found, stop retrying
+    if (error) {
+      console.error('Cable fetch error:', error)
+      if (mounted) setError('Could not load cable details.')
+      if (mounted) setLoading(false)
+      return
+    }
+
+    console.log(`Cable not found on attempt ${attempt}, retrying...`)
+  }
+
+  // After 5 attempts if still no cable, transaction may have already completed
+  if (!cable) {
+    console.log('Cable not found after 5 attempts — transaction may be complete')
+    if (mounted) router.push('/browse?completed=true')
+    return
+  }
+
+  if (mounted) {
+    setCable(cable)
+    setGiver(cable.profiles)
+  }
+
+  // Retry claim fetch up to 3 times
+  let claim = null
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const { data, error } = await supabase
+      .from('claims')
+      .select('*')
+      .eq('cable_id', id)
+      .eq('claimer_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    console.log(`Claim fetch attempt ${attempt}:`, data, error)
+
+    if (data) {
+      claim = data
+      break
+    }
+
+    if (error) {
+      console.error('Claim fetch error:', error)
+      if (mounted) setError('Could not load claim details.')
+      if (mounted) setLoading(false)
+      return
+    }
+
+    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000))
+  }
+
+  if (!claim) {
+    console.log('No claim found after retries')
+    if (mounted) setError('No active claim found. Contact support.')
+    if (mounted) setLoading(false)
+    return
+  }
+
+  console.log('Claim found:', claim.id, 'giver_confirmed:', claim.giver_confirmed,
+    'claimer_confirmed:', claim.claimer_confirmed)
+
+  if (mounted) {
+    setClaim(claim)
+    setLoading(false)
+  }
+
+  // Poll every 5 seconds for giver confirmation
+  pollInterval = setInterval(async () => {
+    if (!mounted) return
+
+    const { data: cableCheck } = await supabase
+      .from('cables')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle()
+
+    console.log('Poll — cable exists:', !!cableCheck)
+
+    if (!cableCheck) {
+      clearInterval(pollInterval)
+      if (mounted) router.push('/browse?completed=true')
+      return
+    }
+
+    const { data: updatedClaim } = await supabase
+      .from('claims')
+      .select('*')
+      .eq('cable_id', id)
+      .eq('claimer_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (updatedClaim && mounted) {
+      console.log('Poll — giver_confirmed:', updatedClaim.giver_confirmed,
+        'claimer_confirmed:', updatedClaim.claimer_confirmed)
+      setClaim(updatedClaim)
+    }
+  }, 5000)
+}
 
     init()
 
