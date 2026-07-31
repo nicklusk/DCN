@@ -9,24 +9,15 @@ export default function NotificationListener() {
 
   useEffect(() => {
     let channel = null
+    let currentUserId = null
 
     const setup = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
-      // Get all cables owned by this user so we can check incoming claims
-      const { data: myCables } = await supabase
-        .from('cables')
-        .select('id, cable_type')
-        .eq('user_id', user.id)
-
-      if (!myCables || myCables.length === 0) return
-
-      const myCableMap = {}
-      myCables.forEach(c => { myCableMap[c.id] = c.cable_type })
+      currentUserId = user.id
 
       channel = supabase
-        .channel(`notify-claims-${user.id}`)
+        .channel(`notify-${user.id}-${Math.random()}`)
         .on(
           'postgres_changes',
           {
@@ -34,14 +25,22 @@ export default function NotificationListener() {
             schema: 'public',
             table: 'claims',
           },
-          (payload) => {
-            const cableType = myCableMap[payload.new.cable_id]
-            if (cableType) {
-              setToast(`Someone reserved your ${cableType}! Tap to confirm.`)
+          async (payload) => {
+            // On each new claim, check if it's for one of our cables
+            const { data: cable } = await supabase
+              .from('cables')
+              .select('cable_type, user_id')
+              .eq('id', payload.new.cable_id)
+              .single()
+
+            if (cable?.user_id === currentUserId) {
+              setToast(`Someone reserved your ${cable.cable_type}! Tap to confirm.`)
             }
           }
         )
-        .subscribe()
+        .subscribe((status) => {
+          console.log('Notification subscription status:', status)
+        })
     }
 
     setup()

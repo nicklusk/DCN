@@ -12,30 +12,32 @@ export default function Confirmed() {
   const router = useRouter()
   const { id } = useParams()
 
-    useEffect(() => {
+  useEffect(() => {
     let pollInterval = null
+    let mounted = true
 
     const init = async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { router.push('/login'); return }
-        setUser(user)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !mounted) return
+      setUser(user)
 
-        const { data: cable } = await supabase
+      const { data: cable } = await supabase
         .from('cables')
         .select('*, profiles(full_name)')
         .eq('id', id)
         .single()
 
-        // Cable already deleted — transaction completed by giver
-        if (!cable) {
-        router.push('/browse?completed=true')
+      if (!cable) {
+        if (mounted) router.push('/browse?completed=true')
         return
-        }
+      }
 
+      if (mounted) {
         setCable(cable)
         setGiver(cable.profiles)
+      }
 
-        const { data: claim } = await supabase
+      const { data: claim } = await supabase
         .from('claims')
         .select('*')
         .eq('cable_id', id)
@@ -45,53 +47,62 @@ export default function Confirmed() {
         .limit(1)
         .single()
 
-        // Claim already gone — completed or expired
-        if (!claim) {
-        router.push('/browse?completed=true')
+      if (!claim) {
+        if (mounted) router.push('/browse?completed=true')
         return
-        }
+      }
 
+      if (mounted) {
         setClaim(claim)
         setLoading(false)
+      }
 
-        // Poll every 5 seconds to detect when giver confirms
-        pollInterval = setInterval(async () => {
+      // Single interval — only poll if not already both confirmed
+      pollInterval = setInterval(async () => {
+        if (!mounted) return
+
         // Check if cable still exists
         const { data: cableCheck } = await supabase
-            .from('cables')
-            .select('id')
-            .eq('id', id)
-            .single()
+          .from('cables')
+          .select('id')
+          .eq('id', id)
+          .maybeSingle()
 
         if (!cableCheck) {
-            // Cable deleted — giver confirmed and transaction completed
-            clearInterval(pollInterval)
-            router.push('/browse?completed=true')
-            return
+          clearInterval(pollInterval)
+          if (mounted) router.push('/browse?completed=true')
+          return
         }
 
-        // Check if giver has confirmed yet
+        // Check latest claim state
         const { data: updatedClaim } = await supabase
-            .from('claims')
-            .select('*')
-            .eq('cable_id', id)
-            .eq('claimer_id', user.id)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
+          .from('claims')
+          .select('*')
+          .eq('cable_id', id)
+          .eq('claimer_id', user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
-        if (updatedClaim) setClaim(updatedClaim)
-        }, 5000)
+        if (!updatedClaim) {
+          clearInterval(pollInterval)
+          if (mounted) router.push('/browse?completed=true')
+          return
+        }
+
+        if (mounted) setClaim(updatedClaim)
+      }, 5000)
     }
 
     init()
 
-    // Clean up interval on unmount
+    // Cleanup on unmount — stops polling
     return () => {
-        if (pollInterval) clearInterval(pollInterval)
+      mounted = false
+      if (pollInterval) clearInterval(pollInterval)
     }
-    }, [id])
+  }, [id]) // Only run when id changes
 
 const handleConfirm = async () => {
   if (!claim) return

@@ -61,9 +61,10 @@ function ClaimForm({ cable, user, onSuccess }) {
       }
 
       // Mark cable as reserved
-      await supabase.from('cables')
-        .update({ status: 'reserved' })
-        .eq('id', cable.id)
+      await supabase.rpc('update_cable_status', {
+        cable_id_input: cable.id,
+        status_input: 'reserved'
+      })
 
       router.push(`/claim/${cable.id}/confirmed`)
     } else {
