@@ -7,54 +7,50 @@ export default function NotificationListener() {
   const [toast, setToast] = useState(null)
   const router = useRouter()
 
-    useEffect(() => {
+  useEffect(() => {
     console.log('NotificationListener mounted')
     let channel = null
+    let currentUserId = null
 
     const setup = async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        console.log('NotificationListener — user:', user?.id)
-        if (!user) return
+      const { data: { user } } = await supabase.auth.getUser()
+      console.log('NotificationListener — user:', user?.id)
+      if (!user) return
+      currentUserId = user.id
 
-        const { data: myCables } = await supabase
-        .from('cables')
-        .select('id, cable_type')
-        .eq('user_id', user.id)
-
-        console.log('NotificationListener — my cables:', myCables)
-
-        if (!myCables || myCables.length === 0) {
-        console.log('NotificationListener — no cables owned, skipping subscription')
-        return
-        }
-
-        const myCableMap = {}
-        myCables.forEach(c => { myCableMap[c.id] = c.cable_type })
-
-        channel = supabase
+      channel = supabase
         .channel(`notify-${user.id}-${Math.random()}`)
         .on('postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'claims' },
-            (payload) => {
+          { event: 'INSERT', schema: 'public', table: 'claims' },
+          async (payload) => {
             console.log('NotificationListener — new claim detected:', payload.new)
-            const cableType = myCableMap[payload.new.cable_id]
-            if (cableType) {
-                setToast(`Someone reserved your ${cableType}! Tap to confirm.`)
+
+            // Check ownership fresh, not from a stale mount-time map
+            const { data: cable } = await supabase
+              .from('cables')
+              .select('cable_type, user_id')
+              .eq('id', payload.new.cable_id)
+              .maybeSingle()
+
+            console.log('NotificationListener — cable lookup:', cable)
+
+            if (cable && cable.user_id === currentUserId) {
+              setToast(`Someone reserved your ${cable.cable_type}! Tap to confirm.`)
             }
-            }
+          }
         )
         .subscribe((status) => {
-            console.log('NotificationListener subscription status:', status)
+          console.log('NotificationListener subscription status:', status)
         })
     }
 
     setup()
 
     return () => {
-        console.log('NotificationListener unmounting')
-        if (channel) supabase.removeChannel(channel)
+      console.log('NotificationListener unmounting')
+      if (channel) supabase.removeChannel(channel)
     }
-    }, [])
+  }, [])
 
   if (!toast) return null
 
