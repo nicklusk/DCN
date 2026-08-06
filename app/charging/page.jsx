@@ -52,9 +52,16 @@ export default function ChargingStationsPage() {
 
   const fetchStations = async (lat, lng) => {
     setLoading(true)
+    console.log('Fetching stations for:', lat, lng)
     try {
-      const res = await fetch(`/api/charging-stations/nearby?lat=${lat}&lng=${lng}&radius=5`)
+      const res = await fetch(`/api/charging-stations/nearby?lat=${lat}&lng=${lng}&radius=3`)
+      console.log('API response status:', res.status)
       const data = await res.json()
+      console.log('Stations received:', data.stations?.length, data.stations)
+      if (data.error) {
+        console.error('API returned error:', data.error)
+        setError(data.error)
+      }
       setStations(data.stations || [])
     } catch (err) {
       console.error('Fetch stations error:', err)

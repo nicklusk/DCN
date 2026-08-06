@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -10,7 +10,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-// Green = confirmed (community-added or verified OSM charging tag)
 const confirmedIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -18,7 +17,6 @@ const confirmedIcon = new L.Icon({
   iconAnchor: [12, 41],
 })
 
-// Gray = likely, unconfirmed (cafe/library/coworking inferred from OSM tags)
 const likelyIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -37,11 +35,16 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersLayerRef = useRef(null)
+  const [mapReady, setMapReady] = useState(false)
 
+  // Initialize the map only once the container div actually exists in the DOM
   useEffect(() => {
-    if (mapInstanceRef.current) return
+    if (mapInstanceRef.current || !mapRef.current) return
 
-    const map = L.map(mapRef.current).setView([center.lat, center.lng], 14)
+    const map = L.map(mapRef.current, {
+      center: [center.lat, center.lng],
+      zoom: 14,
+    })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
@@ -55,21 +58,28 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
     })
 
     mapInstanceRef.current = map
+    setMapReady(true)
+
+    // Leaflet sometimes measures the container before layout settles —
+    // forcing a resize check after mount fixes gray/blank tiles
+    setTimeout(() => map.invalidateSize(), 100)
 
     return () => {
       map.remove()
       mapInstanceRef.current = null
+      setMapReady(false)
     }
   }, [])
 
   useEffect(() => {
-    if (mapInstanceRef.current) {
+    if (mapInstanceRef.current && mapReady) {
       mapInstanceRef.current.setView([center.lat, center.lng], 14)
+      setTimeout(() => mapInstanceRef.current.invalidateSize(), 100)
     }
-  }, [center])
+  }, [center, mapReady])
 
   useEffect(() => {
-    if (!markersLayerRef.current) return
+    if (!markersLayerRef.current || !mapReady) return
     markersLayerRef.current.clearLayers()
 
     stations.forEach(station => {
@@ -99,9 +109,9 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
         .addTo(markersLayerRef.current)
         .openPopup()
     }
-  }, [stations, newStation])
+  }, [stations, newStation, mapReady])
 
-  return <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+  return <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: 400 }} />
 }
 
 function escapeHtml(str) {
