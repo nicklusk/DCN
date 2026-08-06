@@ -122,6 +122,17 @@ export default function ChargingStationsPage() {
         and spots added by the community. Tap the map to add one you know about.
       </p>
 
+      <div style={s.legend}>
+        <div style={s.legendItem}>
+          <span style={{ ...s.legendDot, background: '#2ecc71' }} />
+          <span>Confirmed — community added or verified charging spot</span>
+        </div>
+        <div style={s.legendItem}>
+          <span style={{ ...s.legendDot, background: '#999' }} />
+          <span>Likely — cafe, library, or coworking space (outlets not confirmed)</span>
+        </div>
+      </div>
+
       <div style={s.controls}>
         <button
           style={addMode ? s.addBtnActive : s.addBtn}
@@ -248,4 +259,7 @@ const s = {
   cancelBtn: { flex: 1, background: 'none', border: '1px solid var(--border-strong)', borderRadius: 10, padding: 12, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-primary)' },
   submitBtn: { flex: 1, background: '#2a7c4f', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
   submitBtnDisabled: { flex: 1, background: '#a8d5bc', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, cursor: 'not-allowed', fontFamily: 'inherit' },
+  legend: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' },
+  legendItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' },
+  legendDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
 }

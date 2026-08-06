@@ -6,7 +6,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-// Rough conversion: 1 degree latitude ≈ 69 miles
 function boundingBox(lat, lng, radiusMiles) {
   const latDelta = radiusMiles / 69
   const lngDelta = radiusMiles / (69 * Math.cos(lat * Math.PI / 180))
@@ -23,7 +22,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url)
     const lat = parseFloat(searchParams.get('lat'))
     const lng = parseFloat(searchParams.get('lng'))
-    const radius = parseFloat(searchParams.get('radius')) || 5
+    const radius = parseFloat(searchParams.get('radius')) || 3
 
     if (isNaN(lat) || isNaN(lng)) {
       return NextResponse.json({ error: 'lat and lng are required' }, { status: 400 })
@@ -31,14 +30,19 @@ export async function GET(req) {
 
     const bbox = boundingBox(lat, lng, radius)
 
-    // Query OpenStreetMap's Overpass API for existing tagged charging stations
+    // Query places likely to have outlets: cafes, libraries, coworking spaces
+    // with wifi — a much larger, real-world dataset than the sparse
+    // device_charging_station tag. These are UNVERIFIED — just a strong signal.
     const overpassQuery = `
-      [out:json][timeout:15];
+      [out:json][timeout:20];
       (
+        node["amenity"="cafe"]["internet_access"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["amenity"="library"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["amenity"="coworking_space"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["shop"="coffee"]["internet_access"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
         node["amenity"="device_charging_station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-        node["amenity"="charging_station"]["fee"!~"."](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
       );
-      out body;
+      out body 100;
     `
 
     let osmStations = []
@@ -51,24 +55,28 @@ export async function GET(req) {
 
       if (osmRes.ok) {
         const osmData = await osmRes.json()
-        osmStations = (osmData.elements || []).map(el => ({
-          id: `osm-${el.id}`,
-          source: 'osm',
-          name: el.tags?.name || 'Charging station',
-          description: el.tags?.description || null,
-          lat: el.lat,
-          lng: el.lon,
-          location_type: el.tags?.power_supply || 'public',
-          verified: true,
-          upvotes: null,
-        }))
+        osmStations = (osmData.elements || [])
+          .filter(el => el.tags?.name) // skip unnamed nodes, not useful to show
+          .map(el => {
+            const isConfirmedCharging = el.tags?.amenity === 'device_charging_station'
+            return {
+              id: `osm-${el.id}`,
+              source: 'osm',
+              confidence: isConfirmedCharging ? 'confirmed' : 'likely',
+              name: el.tags.name,
+              description: describeAmenity(el.tags),
+              lat: el.lat,
+              lng: el.lon,
+              location_type: mapOsmType(el.tags),
+              verified: isConfirmedCharging,
+              upvotes: null,
+            }
+          })
       }
     } catch (osmErr) {
       console.error('OSM Overpass fetch failed:', osmErr)
-      // Continue without OSM data rather than failing the whole request
     }
 
-    // Query user-submitted stations from Supabase within the same bounding box
     const { data: userStations, error: dbError } = await supabase
       .from('charging_stations')
       .select('*')
@@ -84,6 +92,7 @@ export async function GET(req) {
     const formattedUserStations = (userStations || []).map(s => ({
       id: s.id,
       source: 'user',
+      confidence: 'confirmed',
       name: s.name,
       description: s.description,
       lat: s.lat,
@@ -101,4 +110,20 @@ export async function GET(req) {
     console.error('Charging stations fetch error:', err)
     return NextResponse.json({ error: 'Failed to fetch charging stations' }, { status: 500 })
   }
+}
+
+function mapOsmType(tags) {
+  if (tags.amenity === 'device_charging_station') return 'charging'
+  if (tags.amenity === 'cafe' || tags.shop === 'coffee') return 'cafe'
+  if (tags.amenity === 'library') return 'library'
+  if (tags.amenity === 'coworking_space') return 'coworking'
+  return 'other'
+}
+
+function describeAmenity(tags) {
+  if (tags.amenity === 'device_charging_station') return 'Dedicated device charging station'
+  if (tags.amenity === 'cafe' || tags.shop === 'coffee') return 'Cafe with WiFi — outlets not confirmed'
+  if (tags.amenity === 'library') return 'Public library — outlets common but not confirmed'
+  if (tags.amenity === 'coworking_space') return 'Coworking space — outlets likely'
+  return null
 }
