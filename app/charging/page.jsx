@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 
 // Leaflet needs the window object, so load it client-side only
-const MapView = dynamic(() => import('@/components/ChargingMapView'), {
+const MapView = dynamic(() => import('@/app/components/ChargingMapView'), {
   ssr: false,
   loading: () => <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading map...</div>
 })
