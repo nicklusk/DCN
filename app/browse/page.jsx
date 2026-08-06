@@ -98,6 +98,7 @@ function Browse() {
           <button style={styles.ghostBtn} onClick={() => router.push('/my-cables')}>My cables</button>
           <button style={styles.ghostBtn} onClick={() => router.push('/messages')}>Messages</button>
           <button style={styles.ghostBtn} onClick={() => router.push('/cables')}>Cable guide</button>
+          <button style={styles.ghostBtn} onClick={() => router.push('/charging')}> ⚡ Charging spots</button>
           <button style={styles.ghostBtn} onClick={() => router.push('/post')}>+ Post</button>
           <button style={styles.ghostBtn} onClick={handleLogout}>Log out</button>
         </div>
