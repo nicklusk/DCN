@@ -31,13 +31,12 @@ const newPinIcon = new L.Icon({
   iconAnchor: [12, 41],
 })
 
-export default function ChargingMapView({ center, stations, onMapClick, newStation }) {
+export default function ChargingMapView({ center, stations, onMapClick, newStation, onBoundsChange }) {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersLayerRef = useRef(null)
   const [mapReady, setMapReady] = useState(false)
 
-  // Initialize the map only once the container div actually exists in the DOM
   useEffect(() => {
     if (mapInstanceRef.current || !mapRef.current) return
 
@@ -57,11 +56,15 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
       onMapClick(e.latlng.lat, e.latlng.lng)
     })
 
+    // Fire when the user finishes panning or zooming (not on every frame)
+    map.on('moveend', () => {
+      const c = map.getCenter()
+      if (onBoundsChange) onBoundsChange(c.lat, c.lng)
+    })
+
     mapInstanceRef.current = map
     setMapReady(true)
 
-    // Leaflet sometimes measures the container before layout settles —
-    // forcing a resize check after mount fixes gray/blank tiles
     setTimeout(() => map.invalidateSize(), 100)
 
     return () => {
@@ -71,8 +74,10 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
     }
   }, [])
 
+  // Only recenter programmatically (e.g. "Recenter on me" button) —
+  // NOT on every render, or it would fight the user's own panning
   useEffect(() => {
-    if (mapInstanceRef.current && mapReady) {
+    if (mapInstanceRef.current && mapReady && center.forceRecenter) {
       mapInstanceRef.current.setView([center.lat, center.lng], 14)
       setTimeout(() => mapInstanceRef.current.invalidateSize(), 100)
     }

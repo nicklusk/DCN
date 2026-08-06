@@ -4,45 +4,43 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 
-// Leaflet needs the window object, so load it client-side only
-const MapView = dynamic(() => import('@/app/components/ChargingMapView'), {
+const MapView = dynamic(() => import('@/components/ChargingMapView'), {
   ssr: false,
   loading: () => <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading map...</div>
 })
 
 export default function ChargingStationsPage() {
-  const [user, setUser] = useState(null)
   const [center, setCenter] = useState(null)
   const [stations, setStations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [addMode, setAddMode] = useState(false)
-  const [newStation, setNewStation] = useState(null) // { lat, lng }
+  const [newStation, setNewStation] = useState(null)
   const [stationName, setStationName] = useState('')
   const [stationDesc, setStationDesc] = useState('')
   const [stationType, setStationType] = useState('cafe')
   const [submitting, setSubmitting] = useState(false)
+  const [searchAreaLabel, setSearchAreaLabel] = useState(null)
   const router = useRouter()
+  const fetchTimeoutRef = useRef(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.push('/login'); return }
-      setUser(data.user)
     })
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+          setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude, forceRecenter: true })
         },
         () => {
-          setError('Could not detect your location. Showing a default area — search a ZIP or city instead.')
-          // Fallback to a reasonable default (center of US) if geolocation fails
-          setCenter({ lat: 39.8283, lng: -98.5795 })
+          setError('Could not detect your location. Pan the map to explore, or your default view is the center of the US.')
+          setCenter({ lat: 39.8283, lng: -98.5795, forceRecenter: true })
         }
       )
     } else {
-      setCenter({ lat: 39.8283, lng: -98.5795 })
+      setCenter({ lat: 39.8283, lng: -98.5795, forceRecenter: true })
     }
   }, [])
 
@@ -55,12 +53,10 @@ export default function ChargingStationsPage() {
     console.log('Fetching stations for:', lat, lng)
     try {
       const res = await fetch(`/api/charging-stations/nearby?lat=${lat}&lng=${lng}&radius=3`)
-      console.log('API response status:', res.status)
       const data = await res.json()
-      console.log('Stations received:', data.stations?.length, data.stations)
+      console.log('Stations received:', data.stations?.length)
       if (data.error) {
         console.error('API returned error:', data.error)
-        setError(data.error)
       }
       setStations(data.stations || [])
     } catch (err) {
@@ -68,6 +64,20 @@ export default function ChargingStationsPage() {
       setError('Could not load charging stations.')
     }
     setLoading(false)
+  }
+
+  // Called when the user finishes panning or zooming the map
+  const handleBoundsChange = (lat, lng) => {
+    setSearchAreaLabel('Searching this area...')
+
+    // Debounce so rapid panning doesn't fire dozens of API calls
+    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current)
+    fetchTimeoutRef.current = setTimeout(() => {
+      // Update center WITHOUT forceRecenter, so the map doesn't jump —
+      // this only updates our data-fetch reference point
+      setCenter({ lat, lng, forceRecenter: false })
+      setSearchAreaLabel(null)
+    }, 600)
   }
 
   const handleMapClick = (lat, lng) => {
@@ -101,13 +111,21 @@ export default function ChargingStationsPage() {
     if (data.error) {
       alert('Could not add station: ' + data.error)
     } else {
-      setStations(prev => [...prev, { ...data.station, source: 'user' }])
+      setStations(prev => [...prev, { ...data.station, source: 'user', confidence: 'confirmed' }])
       setNewStation(null)
       setStationName('')
       setStationDesc('')
       setAddMode(false)
     }
     setSubmitting(false)
+  }
+
+  const handleRecenter = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude, forceRecenter: true })
+      })
+    }
   }
 
   if (!center) return (
@@ -125,8 +143,8 @@ export default function ChargingStationsPage() {
       {error && <div style={s.errorBanner}>{error}</div>}
 
       <p style={s.intro}>
-        Find public places to charge your devices — cafes, airports, libraries,
-        and spots added by the community. Tap the map to add one you know about.
+        Find public places to charge your devices. Pan or zoom the map to
+        explore any area — tap the map to add a spot you know about.
       </p>
 
       <div style={s.legend}>
@@ -147,16 +165,7 @@ export default function ChargingStationsPage() {
         >
           {addMode ? '✕ Cancel adding' : '+ Add a charging spot'}
         </button>
-        <button
-          style={s.ghostBtn}
-          onClick={() => {
-            if (navigator.geolocation) {
-              navigator.geolocation.getCurrentPosition(pos => {
-                setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-              })
-            }
-          }}
-        >
+        <button style={s.ghostBtn} onClick={handleRecenter}>
           📍 Recenter on me
         </button>
       </div>
@@ -173,14 +182,15 @@ export default function ChargingStationsPage() {
           stations={stations}
           onMapClick={handleMapClick}
           newStation={newStation}
+          onBoundsChange={handleBoundsChange}
         />
       </div>
 
-      {loading && <p style={s.muted}>Loading stations...</p>}
+      {(loading || searchAreaLabel) && <p style={s.muted}>{searchAreaLabel || 'Loading stations...'}</p>}
 
-      {!loading && (
+      {!loading && !searchAreaLabel && (
         <p style={s.count}>
-          {stations.length} charging {stations.length === 1 ? 'spot' : 'spots'} found nearby
+          {stations.length} charging {stations.length === 1 ? 'spot' : 'spots'} found in this area
         </p>
       )}
 
@@ -219,10 +229,7 @@ export default function ChargingStationsPage() {
             />
 
             <div style={s.formActions}>
-              <button
-                style={s.cancelBtn}
-                onClick={() => setNewStation(null)}
-              >
+              <button style={s.cancelBtn} onClick={() => setNewStation(null)}>
                 Cancel
               </button>
               <button
@@ -247,7 +254,10 @@ const s = {
   backBtn: { background: 'none', border: 'none', fontSize: 15, color: '#2a7c4f', cursor: 'pointer', fontFamily: 'inherit' },
   title: { fontSize: 17, fontWeight: 500, color: 'var(--text-primary)' },
   errorBanner: { background: '#fef3e2', color: '#7c4f0f', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 12 },
-  intro: { fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 },
+  intro: { fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 12 },
+  legend: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' },
+  legendItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' },
+  legendDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
   controls: { display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
   addBtn: { background: '#2a7c4f', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
   addBtnActive: { background: '#c0392b', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
@@ -266,7 +276,4 @@ const s = {
   cancelBtn: { flex: 1, background: 'none', border: '1px solid var(--border-strong)', borderRadius: 10, padding: 12, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-primary)' },
   submitBtn: { flex: 1, background: '#2a7c4f', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
   submitBtnDisabled: { flex: 1, background: '#a8d5bc', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, cursor: 'not-allowed', fontFamily: 'inherit' },
-  legend: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' },
-  legendItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' },
-  legendDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
 }
