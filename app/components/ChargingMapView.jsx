@@ -17,13 +17,6 @@ const confirmedIcon = new L.Icon({
   iconAnchor: [12, 41],
 })
 
-const likelyIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-})
-
 const newPinIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -36,6 +29,21 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
   const mapInstanceRef = useRef(null)
   const markersLayerRef = useRef(null)
   const [mapReady, setMapReady] = useState(false)
+
+  // Refs that always hold the LATEST callback — this is what fixes the
+  // stale closure problem, since the map's event listener reads from
+  // these refs instead of capturing the function at mount time
+  const onMapClickRef = useRef(onMapClick)
+  const onBoundsChangeRef = useRef(onBoundsChange)
+
+  // Keep the refs updated on every render
+  useEffect(() => {
+    onMapClickRef.current = onMapClick
+  }, [onMapClick])
+
+  useEffect(() => {
+    onBoundsChangeRef.current = onBoundsChange
+  }, [onBoundsChange])
 
   useEffect(() => {
     if (mapInstanceRef.current || !mapRef.current) return
@@ -52,14 +60,17 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
 
     markersLayerRef.current = L.layerGroup().addTo(map)
 
+    // Always call through the ref, so this always uses the CURRENT
+    // addMode/handler, not whatever it was when the map first mounted
     map.on('click', (e) => {
-      onMapClick(e.latlng.lat, e.latlng.lng)
+      if (onMapClickRef.current) {
+        onMapClickRef.current(e.latlng.lat, e.latlng.lng)
+      }
     })
 
-    // Fire when the user finishes panning or zooming (not on every frame)
     map.on('moveend', () => {
       const c = map.getCenter()
-      if (onBoundsChange) onBoundsChange(c.lat, c.lng)
+      if (onBoundsChangeRef.current) onBoundsChangeRef.current(c.lat, c.lng)
     })
 
     mapInstanceRef.current = map
@@ -74,8 +85,6 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
     }
   }, [])
 
-  // Only recenter programmatically (e.g. "Recenter on me" button) —
-  // NOT on every render, or it would fight the user's own panning
   useEffect(() => {
     if (mapInstanceRef.current && mapReady && center.forceRecenter) {
       mapInstanceRef.current.setView([center.lat, center.lng], 14)
@@ -88,20 +97,13 @@ export default function ChargingMapView({ center, stations, onMapClick, newStati
     markersLayerRef.current.clearLayers()
 
     stations.forEach(station => {
-      const icon = station.confidence === 'confirmed' ? confirmedIcon : likelyIcon
-      const marker = L.marker([station.lat, station.lng], { icon })
-
-      const badge = station.confidence === 'confirmed'
-        ? station.source === 'user'
-          ? '<span style="background:#e8f5ee;color:#1a5c36;font-size:11px;padding:2px 8px;border-radius:10px">👥 Community confirmed</span>'
-          : '<span style="background:#e8f5ee;color:#1a5c36;font-size:11px;padding:2px 8px;border-radius:10px">✓ Confirmed charging spot</span>'
-        : '<span style="background:#f5f5f5;color:#666;font-size:11px;padding:2px 8px;border-radius:10px">Likely — unconfirmed</span>'
+      const marker = L.marker([station.lat, station.lng], { icon: confirmedIcon })
 
       const popupHtml = `
         <div style="font-family:system-ui,sans-serif;min-width:180px">
           <div style="font-weight:600;font-size:14px;margin-bottom:4px">${escapeHtml(station.name)}</div>
           ${station.description ? `<div style="font-size:12px;color:#666;margin-bottom:6px">${escapeHtml(station.description)}</div>` : ''}
-          ${badge}
+          <span style="background:#e8f5ee;color:#1a5c36;font-size:11px;padding:2px 8px;border-radius:10px">👥 Community confirmed</span>
         </div>
       `
       marker.bindPopup(popupHtml)
