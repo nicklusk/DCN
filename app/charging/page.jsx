@@ -141,18 +141,14 @@ export default function ChargingStationsPage() {
       {error && <div style={s.errorBanner}>{error}</div>}
 
       <p style={s.intro}>
-        Find public places to charge your devices. Pan or zoom the map to
-        explore any area — tap the map to add a spot you know about.
+        Find public places to charge your devices — added by the Dollar Cable Neighbor
+        community. Don&apos;t see anywhere near you? Be the first to add a spot you know about.
       </p>
 
       <div style={s.legend}>
         <div style={s.legendItem}>
           <span style={{ ...s.legendDot, background: '#2ecc71' }} />
-          <span>Confirmed — community added or verified charging spot</span>
-        </div>
-        <div style={s.legendItem}>
-          <span style={{ ...s.legendDot, background: '#999' }} />
-          <span>Likely — cafe, library, or coworking space (outlets not confirmed)</span>
+          <span>Confirmed charging spot, added by a community member</span>
         </div>
       </div>
 
@@ -186,9 +182,11 @@ export default function ChargingStationsPage() {
 
       {(loading || searchAreaLabel) && <p style={s.muted}>{searchAreaLabel || 'Loading stations...'}</p>}
 
-      {!loading && !searchAreaLabel && (
+      {!loading && (
         <p style={s.count}>
-          {stations.length} charging {stations.length === 1 ? 'spot' : 'spots'} found in this area
+          {stations.length === 0
+            ? "No spots added here yet — tap \"Add a charging spot\" to be the first!"
+            : `${stations.length} charging ${stations.length === 1 ? 'spot' : 'spots'} found in this area`}
         </p>
       )}
 
